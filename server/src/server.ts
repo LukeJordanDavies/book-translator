@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import bookRoutes from "./routes/books.js";
 
 dotenv.config();
 
@@ -15,6 +16,8 @@ app.get("/api/health", (_req, res) => {
     message: "Book Translator API is running"
   });
 });
+
+app.use("/api/books", bookRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
