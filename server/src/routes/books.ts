@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 import multer from "multer";
 import { extractEpub } from "../epub/extractEpub.js";
@@ -40,13 +39,9 @@ router.post("/upload", upload.single("book"), async (req, res) => {
     console.error("EPUB extraction failed:", error);
 
     res.status(400).json({
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to extract EPUB",
+      error: error instanceof Error ? error.message : "Failed to extract EPUB",
     });
   }
 });
 
 export default router;
-

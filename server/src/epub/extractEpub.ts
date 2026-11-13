@@ -1,12 +1,25 @@
-
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
+import * as cheerio from "cheerio";
 import path from "node:path";
+import type { Element, AnyNode } from "domhandler";
+
+export interface ContentBlock {
+  id: string;
+  type: "heading" | "paragraph";
+  tagName: string;
+  text: string;
+  html: string;
+  sourcePath: string;
+  elementPath: string;
+}
 
 export interface Chapter {
   id: string;
   title: string;
-  content: string;
+  sourcePath: string;
+  originalXhtml: string;
+  blocks: ContentBlock[];
 }
 
 export interface ExtractedBook {
@@ -39,56 +52,102 @@ function getText(value: unknown): string {
   return "";
 }
 
-function resolveEpubPath(
-  baseFile: string,
-  relativePath: string
-): string {
-  const decoded = decodeURIComponent(
-    relativePath.split("#")[0]
-  );
+function resolveEpubPath(baseFile: string, relativePath: string): string {
+  const decoded = decodeURIComponent(relativePath.split("#")[0]);
 
   return path.posix.normalize(
-    path.posix.join(path.posix.dirname(baseFile), decoded)
+    path.posix.join(path.posix.dirname(baseFile), decoded),
   );
 }
 
-function extractPlainText(xhtml: string): string {
-  return xhtml
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<\/(?:p|div|h[1-6]|li|blockquote)>/gi, "\n\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+function getElementPath(
+  $: cheerio.CheerioAPI,
+  element: Element
+): string {
+  const parts: string[] = [];
+
+  let current: Element | null = element;
+
+  while (current !== null) {
+    const tagName: string = current.tagName.toLowerCase();
+
+    const parent: AnyNode | null = current.parent;
+
+    if (!parent) {
+      parts.unshift(`${tagName}[1]`);
+      break;
+    }
+
+    const siblings = $(parent)
+      .children(tagName)
+      .toArray();
+
+    const index = siblings.findIndex(
+      (sibling) => sibling === current
+    ) + 1;
+
+    parts.unshift(`${tagName}[${index}]`);
+
+    current = parent.type === "tag"
+      ? (parent as Element)
+      : null;
+  }
+
+  return parts.join("/");
 }
 
-export async function extractEpub(
-  buffer: Buffer
-): Promise<ExtractedBook> {
+function extractBlocks(
+  xhtml: string,
+  chapterId: string,
+  sourcePath: string,
+): ContentBlock[] {
+  const $ = cheerio.load(xhtml, {
+    xml: true,
+  });
+
+  const blocks: ContentBlock[] = [];
+
+  $("body")
+    .find("h1, h2, h3, h4, h5, h6, p")
+    .each((_index, element) => {
+      const tagName = element.tagName.toLowerCase();
+
+      const type: ContentBlock["type"] = tagName.startsWith("h")
+        ? "heading"
+        : "paragraph";
+
+      const text = $(element).text().replace(/\s+/g, " ").trim();
+
+      if (!text) return;
+
+      blocks.push({
+        id: `${chapterId}-block-${blocks.length + 1}`,
+        type,
+        tagName,
+        text,
+        html: $(element).html() ?? "",
+        sourcePath,
+        elementPath: getElementPath($, element),
+      });
+    });
+
+  return blocks;
+}
+
+export async function extractEpub(buffer: Buffer): Promise<ExtractedBook> {
   const zip = await JSZip.loadAsync(buffer);
 
-  // Find the EPUB package document.
-  const containerFile = zip.file(
-    "META-INF/container.xml"
-  );
+  const containerFile = zip.file("META-INF/container.xml");
 
   if (!containerFile) {
     throw new Error("Invalid EPUB: container.xml not found");
   }
 
   const containerXml = await containerFile.async("string");
+
   const container = parser.parse(containerXml);
 
-  const rootfile = asArray(
-    container.container?.rootfiles?.rootfile
-  )[0];
+  const rootfile = asArray(container.container?.rootfiles?.rootfile)[0];
 
   const opfPath = rootfile?.["@_full-path"];
 
@@ -110,19 +169,13 @@ export async function extractEpub(
     throw new Error("Invalid EPUB: package metadata missing");
   }
 
-  // Extract book metadata.
   const metadata = bookPackage.metadata ?? {};
 
-  const title =
-    getText(asArray(metadata.title)[0]) || "Unknown Title";
+  const title = getText(asArray(metadata.title)[0]) || "Unknown Title";
 
-  const author =
-    getText(asArray(metadata.creator)[0]) || "Unknown Author";
+  const author = getText(asArray(metadata.creator)[0]) || "Unknown Author";
 
-  // Create a lookup of resources from the manifest.
-  const manifestItems = asArray(
-    bookPackage.manifest?.item
-  );
+  const manifestItems = asArray(bookPackage.manifest?.item);
 
   const manifest = new Map<string, string>();
 
@@ -135,10 +188,7 @@ export async function extractEpub(
     }
   }
 
-  // Follow the spine to preserve reading order.
-  const spineItems = asArray(
-    bookPackage.spine?.itemref
-  );
+  const spineItems = asArray(bookPackage.spine?.itemref);
 
   const chapters: Chapter[] = [];
 
@@ -151,28 +201,22 @@ export async function extractEpub(
     if (!href) continue;
 
     const chapterPath = resolveEpubPath(opfPath, href);
-    const chapterFile = zip.file(chapterPath);
 
+    const chapterFile = zip.file(chapterPath);
     if (!chapterFile) continue;
 
     const xhtml = await chapterFile.async("string");
-    const parsedChapter = parser.parse(xhtml);
 
-    const body = parsedChapter.html?.body;
+    const blocks = extractBlocks(xhtml, idref, chapterPath);
 
-    // Extract the first heading, if present.
-    const headingMatch = xhtml.match(
-      /<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/i
-    );
-
-    const chapterTitle = headingMatch
-      ? extractPlainText(headingMatch[1])
-      : `Section ${chapters.length + 1}`;
+    const firstHeading = blocks.find((block) => block.type === "heading");
 
     chapters.push({
       id: idref,
-      title: chapterTitle,
-      content: extractPlainText(xhtml),
+      title: firstHeading?.text || `Section ${chapters.length + 1}`,
+      sourcePath: chapterPath,
+      originalXhtml: xhtml,
+      blocks,
     });
   }
 
