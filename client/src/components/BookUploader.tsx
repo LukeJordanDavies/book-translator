@@ -24,7 +24,11 @@ interface Book {
   chapters: Chapter[];
 }
 
-function BookUploader() {
+interface BookUploaderProps {
+  onBookUploaded: () => void;
+}
+
+function BookUploader({onBookUploaded,}: BookUploaderProps) {
   const [book, setBook] = useState<Book | null>(null);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -55,7 +59,8 @@ function BookUploader() {
       }
 
       setBook(data.book);
-      setMessage("EPUB extracted successfully!");
+      onBookUploaded();
+      setMessage(`Book saved successfully! Library ID: ${data.bookId}`);
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Something went wrong",

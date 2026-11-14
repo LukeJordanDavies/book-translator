@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import "./database/database.js";
 import bookRoutes from "./routes/books.js";
 dotenv.config();
 const app = express();
