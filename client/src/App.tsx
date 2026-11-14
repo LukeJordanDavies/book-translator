@@ -1,6 +1,10 @@
 import { useState } from "react";
 import BookUploader from "./components/BookUploader";
 import BookLibrary from "./components/BookLibrary";
+import TranslationSettings from "./components/TranslationSettings";
+import ParagraphTranslator from "./components/ParagraphTranslator";
+
+import type { TranslationOptions } from "./components/TranslationSettings";
 
 interface ContentBlock {
   id: string;
@@ -31,6 +35,15 @@ function App() {
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
   const [loadingBook, setLoadingBook] = useState(false);
   const [error, setError] = useState("");
+  const [translationSettings, setTranslationSettings] =
+    useState<TranslationOptions>({
+      targetLanguage: "French",
+      style: "literary",
+      contextMode: "previous",
+    });
+  const [paragraphToTranslate, setParagraphToTranslate] = useState<
+    string | null
+  >(null);
 
   function handleBookUploaded() {
     setRefreshKey((previous) => previous + 1);
@@ -48,6 +61,7 @@ function App() {
     setError("");
     setSelectedBook(null);
     setSelectedChapter(null);
+    setParagraphToTranslate(null);
 
     try {
       const response = await fetch(`/api/books/${bookId}`);
@@ -71,7 +85,18 @@ function App() {
 
       <BookUploader onBookUploaded={handleBookUploaded} />
 
-      <BookLibrary onSelectBook={handleSelectBook} onBookDeleted={handleBookDeleted} refreshKey={refreshKey} />
+      <BookLibrary
+        onSelectBook={handleSelectBook}
+        onBookDeleted={handleBookDeleted}
+        refreshKey={refreshKey}
+      />
+
+      {selectedBook && (
+        <TranslationSettings
+          settings={translationSettings}
+          onChange={setTranslationSettings}
+        />
+      )}
 
       {loadingBook && <p>Loading book...</p>}
       {error && <p>{error}</p>}
@@ -97,14 +122,32 @@ function App() {
             <article>
               <h3>{selectedBook.chapters[selectedChapter].title}</h3>
 
-              {selectedBook.chapters[selectedChapter].blocks.map((block) =>
-                block.type === "heading" ? (
-                  <h3 key={block.id}>{block.text}</h3>
-                ) : (
-                  <p key={block.id}>{block.text}</p>
-                ),
-              )}
+              {selectedBook.chapters[selectedChapter].blocks.map((block) => (
+                <div key={block.id}>
+                  {block.type === "heading" ? (
+                    <h3>{block.text}</h3>
+                  ) : (
+                    <p>{block.text}</p>
+                  )}
+
+                  {block.type === "paragraph" && (
+                    <button
+                      type="button"
+                      onClick={() => setParagraphToTranslate(block.text)}
+                    >
+                      Select for Translation
+                    </button>
+                  )}
+                </div>
+              ))}
             </article>
+          )}
+          {paragraphToTranslate && (
+            <ParagraphTranslator
+              key={paragraphToTranslate}
+              text={paragraphToTranslate}
+              settings={translationSettings}
+            />
           )}
         </section>
       )}

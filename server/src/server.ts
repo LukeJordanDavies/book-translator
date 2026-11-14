@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import "./database/database.js";
 import bookRoutes from "./routes/books.js";
+import translationRoutes from "./routes/translations.js";
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/books", bookRoutes);
+app.use("/api/translations", translationRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
