@@ -1,11 +1,11 @@
 import {
   getChapterBlocks,
-  getChapterTranslations,
+  getFormattedChapterTranslations,
   saveTranslation,
 } from "../database/translationRepository.js";
 
 import {
-  translateText,
+  translateFormattedText,
   type TranslationOptions,
 } from "./translationService.js";
 
@@ -29,7 +29,7 @@ export async function translateChapterBatch(
     contextMode: settings.contextMode,
   };
 
-  const saved = getChapterTranslations(
+  const saved = getFormattedChapterTranslations(
     blocks.map((block) => block.id),
     key
   );
@@ -38,9 +38,8 @@ export async function translateChapterBatch(
     .filter((block) => !saved.has(block.id))
     .slice(0, BATCH_SIZE);
 
+  
   for (const block of pending) {
-    // Retrieve up to 2,000 characters of preceding
-    // narrative text for translation continuity.
     const previousText = blocks
       .filter((item) => item.position < block.position)
       .map((item) => saved.get(item.id) ?? item.text)
@@ -52,11 +51,11 @@ export async function translateChapterBatch(
         ? previousText
         : undefined;
 
-    const translatedText = await translateText({
-      text: block.text,
+    const result = await translateFormattedText(
+      block.html,
       settings,
-      previousContext,
-    });
+      previousContext
+    );
 
     saveTranslation(
       {
@@ -65,10 +64,11 @@ export async function translateChapterBatch(
         style: settings.style,
         contextMode: settings.contextMode,
       },
-      translatedText
+      result.translatedText,
+      result.translatedHtml
     );
 
-    saved.set(block.id, translatedText);
+    saved.set(block.id, result.translatedText);
   }
 
   const completed = blocks.filter((block) =>

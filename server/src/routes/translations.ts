@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import {
-  translateText,
+  translateFormattedText,
   type TranslationOptions,
 } from "../services/translationService.js";
 
@@ -192,7 +192,7 @@ router.post("/", async (req, res) => {
 
     const existing = getTranslation(key);
 
-    if (existing) {
+    if (existing && existing.translated_html !== null) {
       res.json({
         translatedText: existing.translated_text,
         cached: true,
@@ -206,16 +206,21 @@ router.post("/", async (req, res) => {
       });
       return;
     }
+    
+    const result = await translateFormattedText(
+      block.html,
+      settings
+    );
 
-    const translatedText = await translateText({
-      text: block.text,
-      settings,
-    });
+    saveTranslation(
+      key,
+      result.translatedText,
+      result.translatedHtml
+    );
 
-    saveTranslation(key, translatedText);
 
     res.json({
-      translatedText,
+      translatedText: result.translatedText,
       cached: false,
     });
   } catch (error) {

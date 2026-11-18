@@ -98,4 +98,24 @@ db.exec(`
     ON content_blocks(chapter_id, position);
 `);
 
+
+const translationColumns = db
+  .prepare("PRAGMA table_info(translations)")
+  .all() as Array<{ name: string }>;
+
+const hasTranslatedHtml = translationColumns.some(
+  (column) => column.name === "translated_html"
+);
+
+if (!hasTranslatedHtml) {
+  db.exec(`
+    ALTER TABLE translations
+    ADD COLUMN translated_html TEXT
+  `);
+
+  console.log(
+    "Database updated: added translated_html column"
+  );
+}
+
 export default db;

@@ -7,6 +7,7 @@ export interface SavedTranslation {
   style: string;
   context_mode: string;
   translated_text: string;
+  translated_html: string | null;
   created_at: string;
 }
 
@@ -38,9 +39,11 @@ export function getTranslation({
   ) as SavedTranslation | undefined;
 }
 
+
 export function saveTranslation(
   options: TranslationKey,
-  translatedText: string
+  translatedText: string,
+  translatedHtml: string | null = null
 ): SavedTranslation {
   db.prepare(`
     INSERT INTO translations (
@@ -48,9 +51,10 @@ export function saveTranslation(
       target_language,
       style,
       context_mode,
-      translated_text
+      translated_text,
+      translated_html
     )
-    VALUES (?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT (
       block_id,
       target_language,
@@ -59,38 +63,47 @@ export function saveTranslation(
     )
     DO UPDATE SET
       translated_text = excluded.translated_text,
+      translated_html = excluded.translated_html,
       created_at = CURRENT_TIMESTAMP
   `).run(
     options.blockId,
     options.targetLanguage,
     options.style,
     options.contextMode,
-    translatedText
+    translatedText,
+    translatedHtml
   );
 
   const saved = getTranslation(options);
 
   if (!saved) {
-    throw new Error("Failed to retrieve saved translation");
+    throw new Error(
+      "Failed to retrieve saved translation"
+    );
   }
 
   return saved;
 }
 
+
 export function getOriginalBlock(blockId: number) {
   return db.prepare(`
-    SELECT id, text
+    SELECT id, text, html
     FROM content_blocks
     WHERE id = ?
   `).get(blockId) as
-    | { id: number; text: string }
+    | {
+        id: number;
+        text: string;
+        html: string;
+      }
     | undefined;
 }
-
 
 export interface ChapterBlock {
   id: number;
   text: string;
+  html: string;
   position: number;
 }
 
@@ -109,7 +122,7 @@ export function getChapterBlocks(
   if (!chapter) return null;
 
   return db.prepare(`
-    SELECT id, text, position
+    SELECT id, text, html, position
     FROM content_blocks
     WHERE chapter_id = ?
       AND type = 'paragraph'
@@ -174,4 +187,32 @@ export function getSavedChapterTranslations(
   });
 }
 
+
+export function getFormattedChapterTranslations(
+  blockIds: number[],
+  settings: TranslationKey
+): Map<number, string> {
+  const translations = new Map<number, string>();
+
+  for (const blockId of blockIds) {
+    const saved = getTranslation({
+      blockId,
+      targetLanguage: settings.targetLanguage,
+      style: settings.style,
+      contextMode: settings.contextMode,
+    });
+
+    if (
+      saved &&
+      saved.translated_html !== null
+    ) {
+      translations.set(
+        blockId,
+        saved.translated_text
+      );
+    }
+  }
+
+  return translations;
+}
 
