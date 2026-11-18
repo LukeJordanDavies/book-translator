@@ -1,4 +1,3 @@
-
 import db from "./database.js";
 import type { ExtractedBook } from "../epub/extractEpub.js";
 
@@ -130,6 +129,7 @@ interface ChapterRow {
 }
 
 interface BlockRow {
+  id: number;
   original_id: string;
   type: "heading" | "paragraph";
   tag_name: string;
@@ -157,7 +157,7 @@ export function getBookById(bookId: number) {
   `).all(bookId) as ChapterRow[];
 
   const blocksStatement = db.prepare(`
-    SELECT original_id, type, tag_name, text,
+    SELECT id, original_id, type, tag_name, text,
            html, source_path, element_path
     FROM content_blocks
     WHERE chapter_id = ?
@@ -178,6 +178,7 @@ export function getBookById(bookId: number) {
         originalXhtml: chapter.original_xhtml,
         blocks: blocks.map((block) => ({
           id: block.original_id,
+          databaseId: block.id,
           type: block.type,
           tagName: block.tag_name,
           text: block.text,

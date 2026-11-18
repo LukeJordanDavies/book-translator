@@ -78,7 +78,7 @@ export function getBookById(bookId) {
     ORDER BY position
   `).all(bookId);
     const blocksStatement = db.prepare(`
-    SELECT original_id, type, tag_name, text,
+    SELECT id, original_id, type, tag_name, text,
            html, source_path, element_path
     FROM content_blocks
     WHERE chapter_id = ?
@@ -95,6 +95,7 @@ export function getBookById(bookId) {
                 originalXhtml: chapter.original_xhtml,
                 blocks: blocks.map((block) => ({
                     id: block.original_id,
+                    databaseId: block.id,
                     type: block.type,
                     tagName: block.tag_name,
                     text: block.text,

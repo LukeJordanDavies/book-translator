@@ -70,6 +70,27 @@ db.exec(`
       ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS translations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    block_id INTEGER NOT NULL,
+    target_language TEXT NOT NULL,
+    style TEXT NOT NULL,
+    context_mode TEXT NOT NULL,
+    translated_text TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (block_id)
+      REFERENCES content_blocks(id)
+      ON DELETE CASCADE,
+
+    UNIQUE (
+      block_id,
+      target_language,
+      style,
+      context_mode
+    )
+  );
+
   CREATE INDEX IF NOT EXISTS idx_chapters_book
     ON chapters(book_id, position);
 
