@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import type { AnyNode, Element } from "domhandler";
-import { XMLValidator } from "fast-xml-parser";
+import { SyntaxValidator } from "fast-xml-validator";
 
 export interface FormattingTag {
   id: number;
@@ -60,7 +60,7 @@ export function prepareFormattedText(
   html: string
 ): PreparedText {
   // Reject malformed XML before processing.
-  const validation = XMLValidator.validate(
+  const validation = SyntaxValidator.validate(
     `<translation-root>${html}</translation-root>`
   );
 
@@ -304,7 +304,7 @@ export function restoreFormattedHtml(
     translatedText.slice(lastIndex)
   );
 
-  const validation = XMLValidator.validate(
+  const validation = SyntaxValidator.validate(
     `<translation-root>${html}</translation-root>`
   );
 

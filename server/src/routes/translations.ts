@@ -11,9 +11,7 @@ import {
   getOriginalBlock,
 } from "../database/translationRepository.js";
 
-import {
-  getSavedChapterTranslations,
-} from "../database/translationRepository.js";
+import { getSavedChapterTranslations } from "../database/translationRepository.js";
 
 import { translateChapterBatch } from "../services/chapterTranslationService.js";
 
@@ -42,7 +40,6 @@ function validSettings(value: unknown): value is TranslationOptions {
     (settings.contextMode === "previous" || settings.contextMode === "none")
   );
 }
-
 
 router.get("/chapter/:bookId/:chapterId", (req, res) => {
   const bookId = Number(req.params.bookId);
@@ -76,14 +73,10 @@ router.get("/chapter/:bookId/:chapterId", (req, res) => {
   }
 
   try {
-    const translations = getSavedChapterTranslations(
-      bookId,
-      chapterId,
-      {
-        blockId: 0,
-        ...settings,
-      }
-    );
+    const translations = getSavedChapterTranslations(bookId, chapterId, {
+      blockId: 0,
+      ...settings,
+    });
 
     if (translations === null) {
       res.status(404).json({
@@ -94,17 +87,13 @@ router.get("/chapter/:bookId/:chapterId", (req, res) => {
 
     res.json({ translations });
   } catch (error) {
-    console.error(
-      "Failed to retrieve chapter translations:",
-      error
-    );
+    console.error("Failed to retrieve chapter translations:", error);
 
     res.status(500).json({
       error: "Failed to load chapter translations",
     });
   }
 });
-
 
 // Retrieve an existing translation.
 router.get("/:blockId", (req, res) => {
@@ -206,18 +195,10 @@ router.post("/", async (req, res) => {
       });
       return;
     }
-    
-    const result = await translateFormattedText(
-      block.html,
-      settings
-    );
 
-    saveTranslation(
-      key,
-      result.translatedText,
-      result.translatedHtml
-    );
+    const result = await translateFormattedText(block.html, settings);
 
+    saveTranslation(key, result.translatedText, result.translatedHtml);
 
     res.json({
       translatedText: result.translatedText,
