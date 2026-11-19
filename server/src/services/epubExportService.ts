@@ -234,3 +234,69 @@ export async function reconstructEpubXhtml(
   };
 }
 
+
+export async function generateTranslatedEpub(
+  bookId: number,
+  settings: TranslationOptions
+): Promise<Buffer> {
+  const {
+    zip,
+    replacedParagraphs,
+  } = await reconstructEpubXhtml(
+    bookId,
+    settings
+  );
+
+  if (replacedParagraphs === 0) {
+    throw new Error(
+      "No translated paragraphs available for export"
+    );
+  }
+
+  // The EPUB specification requires the mimetype
+  // file to be the first ZIP entry, uncompressed.
+  const outputZip = new JSZip();
+
+  outputZip.file(
+    "mimetype",
+    "application/epub+zip",
+    {
+      compression: "STORE",
+    }
+  );
+
+  // Copy the remaining files from the modified EPUB.
+  for (const [path, file] of Object.entries(
+    zip.files
+  )) {
+    if (path === "mimetype") {
+      continue;
+    }
+
+    if (file.dir) {
+      outputZip.folder(path);
+      continue;
+    }
+
+    const contents = await file.async("uint8array");
+
+    outputZip.file(path, contents, {
+      compression: "DEFLATE",
+      compressionOptions: {
+        level: 6,
+      },
+    });
+  }
+
+  const result = await outputZip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+    compressionOptions: {
+      level: 6,
+    },
+  });
+
+  return result;
+}
+
+

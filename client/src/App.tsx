@@ -5,6 +5,7 @@ import TranslationSettings from "./components/TranslationSettings";
 import ParagraphTranslator from "./components/ParagraphTranslator";
 import ChapterTranslator from "./components/ChapterTranslator";
 import ChapterReader from "./components/ChapterReader";
+import EpubExporter from "./components/EpubExporter";
 
 import type { TranslationOptions } from "./components/TranslationSettings";
 
@@ -105,6 +106,7 @@ function App() {
         />
       )}
 
+
       {loadingBook && <p>Loading book...</p>}
       {error && <p>{error}</p>}
 
@@ -174,6 +176,13 @@ function App() {
                 refreshKey={translationRefreshKey}
               />
             </>
+          )}
+
+          {selectedBook && (
+            <EpubExporter
+              bookId={selectedBook.id}
+              settings={translationSettings}
+            />
           )}
 
           {paragraphToTranslate && (

@@ -182,3 +182,40 @@ code {
     border-bottom: 1px dashed #e2e8f0;
   }
 }
+
+.epub-exporter {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+}
+
+.epub-exporter h3 {
+  margin-top: 0;
+}
+
+.epub-exporter button {
+  margin: 8px 8px 8px 0;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.epub-exporter button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.export-status {
+  margin: 16px 0;
+}
+
+.export-status p {
+  margin: 6px 0;
+}
+
+.export-error {
+  color: #b91c1c;
+  margin-top: 12px;
+}
+
