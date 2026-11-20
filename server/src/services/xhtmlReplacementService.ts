@@ -109,9 +109,21 @@ export function replaceXhtmlParagraphs(
       );
     }
 
-    if (element.name.toLowerCase() !== "p") {
+    const allowedBlockTags = new Set([
+      "p",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+    ]);
+
+    const actualTag = element.name.toLowerCase();
+
+    if (!allowedBlockTags.has(actualTag)) {
       throw new Error(
-        `Block ${replacement.blockId}: expected a paragraph, found ${element.name}`
+        `Block ${replacement.blockId}: unsupported text element ${element.name}`
       );
     }
 

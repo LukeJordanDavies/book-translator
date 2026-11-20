@@ -102,6 +102,7 @@ export function getOriginalBlock(blockId: number) {
 
 export interface ChapterBlock {
   id: number;
+  type: "heading" | "paragraph",
   text: string;
   html: string;
   position: number;
@@ -122,10 +123,10 @@ export function getChapterBlocks(
   if (!chapter) return null;
 
   return db.prepare(`
-    SELECT id, text, html, position
+    SELECT id, type, text, html, position
     FROM content_blocks
     WHERE chapter_id = ?
-      AND type = 'paragraph'
+      AND type IN ('heading', 'paragraph')
       AND TRIM(text) != ''
     ORDER BY position
   `).all(chapter.id) as ChapterBlock[];

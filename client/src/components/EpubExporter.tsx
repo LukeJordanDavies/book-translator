@@ -177,7 +177,7 @@ export default function EpubExporter({
       {status && (
         <div className="export-status">
           <p>
-            Translated paragraphs:{" "}
+            Translated text blocks:{" "}
             {status.translated} / {status.total}
           </p>
 
@@ -189,8 +189,8 @@ export default function EpubExporter({
             <p>Ready to export.</p>
           ) : (
             <p>
-              Complete the remaining translations
-              before exporting.
+              Complete the remaining headings and
+              paragraphs before exporting.
             </p>
           )}
         </div>

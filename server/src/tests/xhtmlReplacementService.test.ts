@@ -112,3 +112,41 @@ test("rejects invalid translated XHTML", () => {
     );
   }, /invalid translated XHTML/);
 });
+
+
+test("replaces a heading and preserves its attributes", () => {
+  const xhtml = `<?xml version="1.0"?>
+  <html xmlns="http://www.w3.org/1999/xhtml">
+    <head><title>Test</title></head>
+    <body>
+      <h2 class="chapter-title">Chapter One</h2>
+      <p>Once upon a time.</p>
+    </body>
+  </html>`;
+
+  const result = replaceXhtmlParagraphs(xhtml, [
+    {
+      blockId: 1,
+      elementPath: "html[1]/body[1]/h2[1]",
+      originalHtml: "Chapter One",
+      translatedHtml: "Chapitre Un",
+    },
+  ]);
+
+  const $ = cheerio.load(result, {
+    xmlMode: true,
+  });
+
+  assert.equal($("h2").text(), "Chapitre Un");
+
+  assert.equal(
+    $("h2").attr("class"),
+    "chapter-title"
+  );
+
+  assert.equal(
+    $("p").text(),
+    "Once upon a time."
+  );
+});
+

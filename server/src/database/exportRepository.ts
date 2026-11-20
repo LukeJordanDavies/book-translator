@@ -45,7 +45,7 @@ export function getExportBlocks(
       AND t.style = ?
       AND t.context_mode = ?
     WHERE c.book_id = ?
-      AND cb.type = 'paragraph'
+      AND cb.type IN ('heading', 'paragraph')
       AND TRIM(cb.text) != ''
     ORDER BY c.position, cb.position
   `).all(
