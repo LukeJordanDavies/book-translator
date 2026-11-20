@@ -11,6 +11,10 @@ import {
   type ExportBlock,
 } from "../database/exportRepository.js";
 
+import {
+  validateEpub,
+} from "./epubValidationService.js";
+
 import type {
   TranslationOptions,
 } from "./translationService.js";
@@ -287,14 +291,40 @@ export async function generateTranslatedEpub(
       },
     });
   }
-
+  
   const result = await outputZip.generateAsync({
     type: "nodebuffer",
     compression: "DEFLATE",
     compressionOptions: {
       level: 6,
-    },
+  },
   });
+
+  const validation = await validateEpub(result);
+
+  if (!validation.valid) {
+    console.error(
+      "EPUB validation errors:",
+      validation.errors
+    );
+
+    throw new Error(
+      "EPUB_VALIDATION_FAILED: " +
+      validation.errors.join("; ")
+    );
+  }
+
+  if (validation.warnings.length > 0) {
+    console.warn(
+      "EPUB validation warnings:",
+      validation.warnings
+    );
+  }
+
+  console.log(
+    `EPUB validated: ${validation.filesChecked} files, ` +
+    `${validation.xhtmlFilesChecked} XHTML files`
+  );
 
   return result;
 }

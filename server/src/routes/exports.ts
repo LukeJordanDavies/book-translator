@@ -150,6 +150,19 @@ router.post("/download", async (req, res) => {
       return;
     }
 
+    if (
+    error instanceof Error &&
+    error.message.startsWith(
+        "EPUB_VALIDATION_FAILED"
+    )
+    ) {
+    res.status(422).json({
+        error:
+        "The translated EPUB failed structural validation. Check the server logs for details.",
+    });
+    return;
+    }
+
     res.status(500).json({
       error: "Failed to generate translated EPUB",
     });
