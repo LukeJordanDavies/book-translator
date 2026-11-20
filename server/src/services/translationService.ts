@@ -4,6 +4,12 @@ import {
   restoreFormattedHtml,
 } from "./formattingService.js";
 
+import {
+  splitTextIntoSegments,
+  joinTextSegments,
+  type TextSegment,
+} from "./textSegmentationService.js";
+
 export interface TranslationOptions {
   targetLanguage: string;
   style: "literary" | "faithful";
@@ -98,24 +104,64 @@ export async function translateFormattedText(
 }> {
   const prepared = prepareFormattedText(html);
 
-  const translatedWithMarkers = await translateText({
-    text: prepared.text,
-    settings,
-    previousContext,
-  });
+  const segments = splitTextIntoSegments(
+    prepared.text,
+    3000
+  );
 
-  // Throws an error if formatting markers
-  // are missing, duplicated or incorrectly nested.
+  const translatedSegments: TextSegment[] = [];
+
+  let runningContext =
+    settings.contextMode === "previous"
+      ? previousContext ?? ""
+      : "";
+
+  for (const segment of segments) {
+    const translated = await translateText({
+      text: segment.text,
+      settings,
+      previousContext:
+        settings.contextMode === "previous"
+          ? runningContext || undefined
+          : undefined,
+    });
+
+    if (!translated.trim()) {
+      throw new Error(
+        "Translation returned an empty segment"
+      );
+    }
+
+    translatedSegments.push({
+      text: translated.trim(),
+      separator: segment.separator,
+    });
+
+    if (settings.contextMode === "previous") {
+      const contextText = translated.replace(
+        /\[\[(?:OPEN|CLOSE)_\d+\]\]/g,
+        ""
+      );
+
+      runningContext = (
+        runningContext + "\n\n" + contextText
+      ).slice(-2000);
+    }
+  }
+
+  const translatedWithMarkers =
+    joinTextSegments(translatedSegments);
+
   const translatedHtml = restoreFormattedHtml(
     translatedWithMarkers,
     prepared.tags
   );
 
-  // Remove formatting markers to obtain
-  // the plain-text translation.
-  const translatedText = translatedWithMarkers
-    .replace(/\[\[(?:OPEN|CLOSE)_\d+\]\]/g, "")
-    .trim();
+  const translatedText =
+    translatedWithMarkers.replace(
+      /\[\[(?:OPEN|CLOSE)_\d+\]\]/g,
+      ""
+    );
 
   return {
     translatedText,
