@@ -118,4 +118,47 @@ if (!hasTranslatedHtml) {
   );
 }
 
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS book_translation_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    book_id INTEGER NOT NULL,
+
+    target_language TEXT NOT NULL,
+    style TEXT NOT NULL,
+    context_mode TEXT NOT NULL,
+
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK (
+        status IN (
+          'pending',
+          'running',
+          'paused',
+          'completed',
+          'failed'
+        )
+      ),
+
+    last_error TEXT,
+
+    created_at TEXT NOT NULL
+      DEFAULT CURRENT_TIMESTAMP,
+
+    updated_at TEXT NOT NULL
+      DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (book_id)
+      REFERENCES books(id)
+      ON DELETE CASCADE,
+
+    UNIQUE (
+      book_id,
+      target_language,
+      style,
+      context_mode
+    )
+  );
+`);
+
 export default db;

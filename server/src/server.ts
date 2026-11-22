@@ -5,6 +5,9 @@ import bookRoutes from "./routes/books.js";
 import translationRoutes from "./routes/translations.js";
 import exportRoutes from "./routes/exports.js";
 import bookTranslationRoutes from "./routes/bookTranslation.js";
+import translationJobRoutes from "./routes/translationJobs.js";
+import {translationJobRepository,} from "./database/translationJobRepository.js";
+
 
 dotenv.config();
 
@@ -25,6 +28,19 @@ app.use("/api/books", bookRoutes);
 app.use("/api/translations", translationRoutes);
 app.use("/api/exports", exportRoutes);
 app.use("/api/book-translation", bookTranslationRoutes);
+app.use("/api/translation-jobs", translationJobRoutes);
+
+// A process restart interrupts in-flight jobs.
+// Their completed blocks remain saved in SQLite.
+const recoveredJobs =
+  translationJobRepository.recoverInterruptedJobs();
+
+if (recoveredJobs > 0) {
+  console.log(
+    `Recovered ${recoveredJobs} interrupted ` +
+    `translation job(s). They are now paused.`
+  );
+}
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
