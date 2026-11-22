@@ -275,3 +275,39 @@ test("rejects unsupported target languages", async () => {
     /Unsupported target language/
   );
 });
+
+
+test("updates navigation language without matching headings", async () => {
+  const zip = makeArchive();
+
+  await updateEpubMetadata(
+    zip,
+    [],
+    "French"
+  );
+
+  const xml = await zip
+    .file("OEBPS/nav.xhtml")!
+    .async("string");
+
+  const $ = cheerio.load(xml, {
+    xmlMode: true,
+  });
+
+  assert.equal(
+    $("html").attr("lang"),
+    "fr"
+  );
+
+  assert.equal(
+    $("html").attr("xml:lang"),
+    "fr"
+  );
+
+  // An unmatched label must not be translated.
+  assert.equal(
+    $("nav a").text(),
+    "Chapter One"
+  );
+});
+

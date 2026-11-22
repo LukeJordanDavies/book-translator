@@ -7,7 +7,7 @@ import type {
   ExportBlock,
 } from "../database/exportRepository.js";
 
-const LANGUAGE_CODES: Record<string, string> = {
+export const LANGUAGE_CODES: Record<string, string> = {
   English: "en",
   French: "fr",
   Spanish: "es",
@@ -236,22 +236,30 @@ async function updateNavigationXhtml(
     updated++;
   });
 
-  if (updated > 0) {
-    const html = $("html").first();
+  const html = $("html").first();
 
-    if (html.attr("lang") !== undefined) {
-      html.attr("lang", languageCode);
-    }
+  if (!html.length) {
+    throw new Error(
+      `Missing html element in navigation file: ${filename}`
+    );
+  }
 
-    if (
-      html.attr("xml:lang") !== undefined
-    ) {
-      html.attr("xml:lang", languageCode);
-    }
+  const languageChanged =
+    html.attr("lang") !== languageCode ||
+    html.attr("xml:lang") !== languageCode;
 
+  if (languageChanged) {
+    html.attr("lang", languageCode);
+    html.attr("xml:lang", languageCode);
+  }
+
+  // Save the document when either its language
+  // or one or more navigation labels changed.
+  if (updated > 0 || languageChanged) {
     const result = $.xml();
 
     validateXml(result, filename);
+
     zip.file(filename, result);
   }
 

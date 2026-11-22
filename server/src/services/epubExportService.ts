@@ -11,17 +11,10 @@ import {
   type ExportBlock,
 } from "../database/exportRepository.js";
 
-import {
-  validateEpub,
-} from "./epubValidationService.js";
-
-import type {
-  TranslationOptions,
-} from "./translationService.js";
-
-import {
-  updateEpubMetadata,
-} from "./epubMetadataService.js";
+import {validateEpub,} from "./epubValidationService.js";
+import type {TranslationOptions,} from "./translationService.js";
+import {updateEpubMetadata,} from "./epubMetadataService.js";
+import {updateDocumentLanguages,} from "./epubDocumentLanguageService.js";
 
 export interface ExportValidation {
   ready: boolean;
@@ -271,6 +264,18 @@ export async function generateTranslatedEpub(
     zip,
     blocks,
     settings.targetLanguage
+  );
+
+  const documentLanguageResult =
+    await updateDocumentLanguages(
+      zip,
+      blocks,
+      settings.targetLanguage
+    );
+
+  console.log(
+    `XHTML language updated: ` +
+    `${documentLanguageResult.filesUpdated} files`
   );
 
   console.log(
