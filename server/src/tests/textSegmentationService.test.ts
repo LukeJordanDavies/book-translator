@@ -131,3 +131,33 @@ test("rejects invalid segment lengths", () => {
     /positive integer/
   );
 });
+
+
+test("preserves standalone formatting markers", () => {
+  const text =
+    "The first sentence. " +
+    "[[SELF_1]] " +
+    "The second sentence. " +
+    "The third sentence.";
+
+  const segments = splitTextIntoSegments(
+    text,
+    20
+  );
+
+  assert.equal(
+    joinTextSegments(segments),
+    text
+  );
+
+  const segmentsWithMarker = segments.filter(
+    (segment) =>
+      segment.text.includes("[[SELF_1]]")
+  );
+
+  assert.equal(
+    segmentsWithMarker.length,
+    1
+  );
+});
+

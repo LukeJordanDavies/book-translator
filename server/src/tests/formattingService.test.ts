@@ -100,7 +100,105 @@ test("rejects unsafe links", () => {
 });
 
 test("rejects unsupported inline elements", () => {
-  assert.throws(() => {
-    prepareFormattedText("<img src='image.jpg' />");
-  });
+  assert.throws(
+    () =>
+      prepareFormattedText(
+        "Hello <video>Unsupported content</video> world"
+      ),
+    /Unsupported inline element: video/
+  );
 });
+
+test("preserves line breaks", () => {
+  const prepared = prepareFormattedText(
+    "First line.<br/>Second line."
+  );
+
+  assert.equal(
+    prepared.text,
+    "First line.[[SELF_1]]Second line."
+  );
+
+  const result = restoreFormattedHtml(
+    "Première ligne.[[SELF_1]]Deuxième ligne.",
+    prepared.tags
+  );
+
+  assert.equal(
+    result,
+    "Première ligne.<br/>Deuxième ligne."
+  );
+});
+
+test("preserves inline images", () => {
+  const prepared = prepareFormattedText(
+    'Look <img src="../images/castle.png" alt="Castle"/> here.'
+  );
+
+  const result = restoreFormattedHtml(
+    "Regardez [[SELF_1]] ici.",
+    prepared.tags
+  );
+
+  assert.equal(
+    result,
+    'Regardez <img src="../images/castle.png" alt="Castle"/> ici.'
+  );
+});
+
+test("preserves standalone elements inside formatting", () => {
+  const prepared = prepareFormattedText(
+    "<em>First line.<br/>Second line.</em>"
+  );
+
+  const result = restoreFormattedHtml(
+    "[[OPEN_1]]Première ligne.[[SELF_2]]Deuxième ligne.[[CLOSE_1]]",
+    prepared.tags
+  );
+
+  assert.equal(
+    result,
+    "<em>Première ligne.<br/>Deuxième ligne.</em>"
+  );
+});
+
+test("rejects missing standalone markers", () => {
+  const prepared = prepareFormattedText(
+    "Hello<br/>World"
+  );
+
+  assert.throws(
+    () =>
+      restoreFormattedHtml(
+        "Bonjour le monde",
+        prepared.tags
+      ),
+    /missing formatting marker/i
+  );
+});
+
+test("rejects duplicated standalone markers", () => {
+  const prepared = prepareFormattedText(
+    "Hello<br/>World"
+  );
+
+  assert.throws(
+    () =>
+      restoreFormattedHtml(
+        "Bonjour[[SELF_1]][[SELF_1]]monde",
+        prepared.tags
+      ),
+    /duplicate formatting marker/i
+  );
+});
+
+test("rejects unsafe inline image sources", () => {
+  assert.throws(
+    () =>
+      prepareFormattedText(
+        '<img src="javascript:alert(1)"/>'
+      ),
+    /unsafe image source/i
+  );
+});
+

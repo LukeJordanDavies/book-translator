@@ -29,7 +29,7 @@ export function splitTextIntoSegments(
   let lastWhitespaceBoundary = -1;
 
   const tokenPattern =
-    /\[\[(OPEN|CLOSE)_\d+\]\]|\s+|[.!?…]+|[\s\S]/gu;
+    /\[\[(OPEN|CLOSE|SELF)_\d+\]\]|\s+|[.!?…]+|[\s\S]/gu;
 
   for (const match of text.matchAll(tokenPattern)) {
     const token = match[0];

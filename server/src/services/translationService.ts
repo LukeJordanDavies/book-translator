@@ -10,6 +10,11 @@ import {
   type TextSegment,
 } from "./textSegmentationService.js";
 
+import {
+  EmptyTranslationError,
+  retryTranslationOutput,
+} from "./translationRetryService.js";
+
 export interface TranslationOptions {
   targetLanguage: string;
   style: "literary" | "faithful";
@@ -64,6 +69,26 @@ Formatting rules:
 - Keep opening and closing markers correctly paired.
 - Place markers around the corresponding translated words.
 - Do not add or remove formatting markers.
+
+Preserve all formatting markers exactly as provided.
+
+Formatting markers include:
+- [[OPEN_n]] for opening formatting elements.
+- [[CLOSE_n]] for closing formatting elements.
+- [[SELF_n]] for standalone elements such as
+  line breaks and images.
+
+Do not translate, rename, duplicate or remove
+any formatting markers.
+
+Preserve the nesting of paired formatting markers.
+
+Preserve standalone markers in their original
+logical positions relative to the translated text.
+
+Do not add new formatting markers.
+
+Return only the translated passage.
 `;
 
   const context =
@@ -87,7 +112,7 @@ ${previousContext}
   const translatedText = response.output_text.trim();
 
   if (!translatedText) {
-    throw new Error("The model returned an empty translation");
+    throw new EmptyTranslationError();
   }
 
   return translatedText;
@@ -116,30 +141,62 @@ export async function translateFormattedText(
       ? previousContext ?? ""
       : "";
 
+  
   for (const segment of segments) {
-    const translated = await translateText({
-      text: segment.text,
-      settings,
-      previousContext:
-        settings.contextMode === "previous"
-          ? runningContext || undefined
-          : undefined,
-    });
+    // Identify formatting tags belonging
+    // to this particular text segment.
+    const markerIds = new Set(
+      Array.from(
+        segment.text.matchAll(
+          /\[\[(?:OPEN|CLOSE|SELF)_(\d+)\]\]/g
+        ),
+        (match) => Number(match[1])
+      )
+    );
 
-    if (!translated.trim()) {
-      throw new Error(
-        "Translation returned an empty segment"
-      );
-    }
+    const expectedTags = prepared.tags.filter(
+      (tag) => markerIds.has(tag.id)
+    );
+
+    // Translate and retry if the model returns
+    // empty text or damaged formatting markers.
+    const translated = await retryTranslationOutput(
+      () =>
+        translateText({
+          text: segment.text,
+          settings,
+          previousContext:
+            settings.contextMode === "previous"
+              ? runningContext || undefined
+              : undefined,
+        }),
+      expectedTags,
+      {
+        maxAttempts: 2,
+        baseDelayMs: 1000,
+
+        onRetry: (attempt, error) => {
+          console.warn(
+            `Retrying invalid translation output ` +
+            `(attempt ${attempt}/2):`,
+            error instanceof Error
+              ? error.message
+              : String(error)
+          );
+        },
+      }
+    );
 
     translatedSegments.push({
       text: translated.trim(),
       separator: segment.separator,
     });
 
+    // Only successful translations contribute
+    // to the context of subsequent segments.
     if (settings.contextMode === "previous") {
       const contextText = translated.replace(
-        /\[\[(?:OPEN|CLOSE)_\d+\]\]/g,
+        /\[\[(?:OPEN|CLOSE|SELF)_\d+\]\]/g,
         ""
       );
 
@@ -148,6 +205,7 @@ export async function translateFormattedText(
       ).slice(-2000);
     }
   }
+
 
   const translatedWithMarkers =
     joinTextSegments(translatedSegments);
@@ -159,7 +217,7 @@ export async function translateFormattedText(
 
   const translatedText =
     translatedWithMarkers.replace(
-      /\[\[(?:OPEN|CLOSE)_\d+\]\]/g,
+      /\[\[(?:OPEN|CLOSE|SELF)_\d+\]\]/g,
       ""
     );
 
