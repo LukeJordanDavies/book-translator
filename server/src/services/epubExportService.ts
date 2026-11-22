@@ -19,6 +19,10 @@ import type {
   TranslationOptions,
 } from "./translationService.js";
 
+import {
+  updateEpubMetadata,
+} from "./epubMetadataService.js";
+
 export interface ExportValidation {
   ready: boolean;
   total: number;
@@ -162,6 +166,7 @@ export async function reconstructEpubXhtml(
   settings: TranslationOptions
 ): Promise<{
   zip: JSZip;
+  blocks: ExportBlock[];
   replacedParagraphs: number;
   modifiedFiles: number;
 }> {
@@ -233,6 +238,7 @@ export async function reconstructEpubXhtml(
 
   return {
     zip,
+    blocks,
     replacedParagraphs,
     modifiedFiles,
   };
@@ -245,6 +251,7 @@ export async function generateTranslatedEpub(
 ): Promise<Buffer> {
   const {
     zip,
+    blocks,
     replacedParagraphs,
   } = await reconstructEpubXhtml(
     bookId,
@@ -253,9 +260,26 @@ export async function generateTranslatedEpub(
 
   if (replacedParagraphs === 0) {
     throw new Error(
-      "No translated paragraphs available for export"
+      "No translated text blocks available for export"
     );
   }
+
+  // Update language metadata and navigation labels
+  // after reconstructing XHTML, but before
+  // packaging the final EPUB ZIP.
+  const metadataResult = await updateEpubMetadata(
+    zip,
+    blocks,
+    settings.targetLanguage
+  );
+
+  console.log(
+    `EPUB metadata updated: language ${metadataResult.languageCode}`
+  );
+
+  console.log(
+    `Navigation labels translated: ${metadataResult.navigationLabelsUpdated}`
+  );
 
   // The EPUB specification requires the mimetype
   // file to be the first ZIP entry, uncompressed.

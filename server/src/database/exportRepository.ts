@@ -3,6 +3,7 @@ import db from "./database.js";
 export interface ExportBlock {
   id: number;
   chapterId: number;
+  type: "heading" | "paragraph";
   sourcePath: string;
   elementPath: string;
   originalHtml: string;
@@ -33,6 +34,7 @@ export function getExportBlocks(
     SELECT
       cb.id,
       cb.chapter_id AS chapterId,
+      cb.type AS type,
       cb.source_path AS sourcePath,
       cb.element_path AS elementPath,
       cb.html AS originalHtml,
