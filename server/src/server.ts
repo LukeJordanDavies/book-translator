@@ -4,6 +4,7 @@ import "./database/database.js";
 import bookRoutes from "./routes/books.js";
 import translationRoutes from "./routes/translations.js";
 import exportRoutes from "./routes/exports.js";
+import bookTranslationRoutes from "./routes/bookTranslation.js";
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/books", bookRoutes);
 app.use("/api/translations", translationRoutes);
 app.use("/api/exports", exportRoutes);
+app.use("/api/book-translation", bookTranslationRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
