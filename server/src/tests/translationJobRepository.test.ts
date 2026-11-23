@@ -190,3 +190,38 @@ test("recovers running jobs after a restart", () => {
     connection.close();
   }
 });
+
+
+test("finds a job by book and translation settings", () => {
+  const { connection, repository } =
+    createTestRepository();
+
+  try {
+    const original = repository.getOrCreate(
+      1,
+      settings
+    );
+
+    const found =
+      repository.getByBookAndSettings(
+        1,
+        settings
+      );
+
+    assert.equal(found?.id, original.id);
+
+    const differentLanguage =
+      repository.getByBookAndSettings(
+        1,
+        {
+          ...settings,
+          targetLanguage: "German",
+        }
+      );
+
+    assert.equal(differentLanguage, null);
+  } finally {
+    connection.close();
+  }
+});
+

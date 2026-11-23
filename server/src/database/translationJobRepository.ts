@@ -47,6 +47,31 @@ export function createJobRepository(
     return row ?? null;
   }
 
+  function getByBookAndSettings(
+    bookId: number,
+    settings: TranslationOptions
+  ): TranslationJob | null {
+    const row = connection.prepare(`
+      SELECT id
+      FROM book_translation_jobs
+      WHERE book_id = ?
+        AND target_language = ?
+        AND style = ?
+        AND context_mode = ?
+    `).get(
+      bookId,
+      settings.targetLanguage,
+      settings.style,
+      settings.contextMode
+    ) as { id: number } | undefined;
+
+    if (!row) {
+      return null;
+    }
+
+    return getById(row.id);
+  }
+
   function getOrCreate(
     bookId: number,
     settings: TranslationOptions
@@ -139,6 +164,7 @@ export function createJobRepository(
 
   return {
     getById,
+    getByBookAndSettings,
     getOrCreate,
     setStatus,
     recoverInterruptedJobs,

@@ -1,8 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import type {
   TranslationOptions,
 } from "./TranslationSettings";
+
+type JobStatus =
+  | "pending"
+  | "running"
+  | "paused"
+  | "completed"
+  | "failed";
+
+interface TranslationJob {
+  id: number;
+  bookId: number;
+  status: JobStatus;
+  lastError: string | null;
+}
 
 interface ChapterProgress {
   chapterId: number;
@@ -26,8 +45,8 @@ interface BookTranslationProgress {
   chapters: ChapterProgress[];
 }
 
-interface BatchResponse {
-  processedChapterId: number | null;
+interface JobSnapshot {
+  job: TranslationJob | null;
   progress: BookTranslationProgress;
 }
 
@@ -56,56 +75,124 @@ async function getResponseError(
   return `Request failed (${response.status})`;
 }
 
+function getStatusLabel(
+  status: JobStatus | "not-started"
+): string {
+  switch (status) {
+    case "pending":
+      return "Pending";
+    case "running":
+      return "Translating";
+    case "paused":
+      return "Paused";
+    case "completed":
+      return "Completed";
+    case "failed":
+      return "Failed";
+    default:
+      return "Not started";
+  }
+}
+
 export default function FullBookTranslator({
   bookId,
   settings,
   onBatchCompleted,
 }: FullBookTranslatorProps) {
-  const [progress, setProgress] =
-    useState<BookTranslationProgress | null>(null);
+  const [snapshot, setSnapshot] =
+    useState<JobSnapshot | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
-
-  const [pauseRequested, setPauseRequested] =
-    useState(false);
-
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // These refs control the translation loop
-  // without waiting for a React state update.
-  const stopRequestedRef = useRef(false);
-  const activeRef = useRef(false);
+  // Prevent overlapping Start/Pause/Resume commands.
+  const actionInProgressRef = useRef(false);
 
-  // Prevent results for an old book or language
-  // from updating the currently selected book.
+  // Prevent old responses from changing the UI
+  // after selecting another book or language.
   const generationRef = useRef(0);
+  const requestVersionRef = useRef(0);
 
+  // Used to refresh the chapter reader when
+  // the server saves more translations.
+  const lastBlockCountRef =
+    useRef<number | null>(null);
+
+  const onBatchCompletedRef =
+    useRef(onBatchCompleted);
+
+  useEffect(() => {
+    onBatchCompletedRef.current =
+      onBatchCompleted;
+  }, [onBatchCompleted]);
+
+  const acceptSnapshot = useCallback(
+    (result: JobSnapshot) => {
+      if (
+        !result ||
+        !result.progress ||
+        typeof result.progress.translatedBlocks !==
+          "number"
+      ) {
+        throw new Error(
+          "Invalid translation progress response"
+        );
+      }
+
+      const previousCount =
+        lastBlockCountRef.current;
+
+      const newCount =
+        result.progress.translatedBlocks;
+
+      if (
+        previousCount !== null &&
+        newCount > previousCount
+      ) {
+        onBatchCompletedRef.current?.();
+      }
+
+      lastBlockCountRef.current = newCount;
+
+      setSnapshot(result);
+    },
+    []
+  );
+
+  // Load an existing job and poll SQLite progress.
   useEffect(() => {
     const generation = ++generationRef.current;
     const controller = new AbortController();
 
-    // If a different book or language was selected,
-    // finish the old in-flight batch but do not
-    // request another.
-    stopRequestedRef.current = true;
+    let polling = false;
 
-    setProgress(null);
-    setError("");
+    lastBlockCountRef.current = null;
+
+    setSnapshot(null);
     setLoading(true);
-    setPauseRequested(activeRef.current);
+    setError("");
+
+    const query = new URLSearchParams({
+      targetLanguage: settings.targetLanguage,
+      style: settings.style,
+      contextMode: settings.contextMode,
+    });
 
     async function loadProgress() {
-      const query = new URLSearchParams({
-        targetLanguage: settings.targetLanguage,
-        style: settings.style,
-        contextMode: settings.contextMode,
-      });
+      if (polling || actionInProgressRef.current) {
+        return;
+      }
+
+      polling = true;
+
+      const requestVersion =
+        requestVersionRef.current;
 
       try {
         const response = await fetch(
-          `/api/book-translation/${bookId}/progress?${query}`,
+          `/api/translation-jobs/by-book/${bookId}?${query}`,
           {
             signal: controller.signal,
           }
@@ -117,19 +204,26 @@ export default function FullBookTranslator({
           );
         }
 
-        const result: BookTranslationProgress =
+        const result: JobSnapshot =
           await response.json();
 
         if (
-          generation === generationRef.current &&
-          !controller.signal.aborted
+          controller.signal.aborted ||
+          generation !== generationRef.current ||
+          requestVersion !==
+            requestVersionRef.current
         ) {
-          setProgress(result);
+          return;
         }
+
+        acceptSnapshot(result);
+        setError("");
       } catch (err) {
         if (
           controller.signal.aborted ||
-          generation !== generationRef.current
+          generation !== generationRef.current ||
+          requestVersion !==
+            requestVersionRef.current
         ) {
           return;
         }
@@ -137,24 +231,33 @@ export default function FullBookTranslator({
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to load book progress"
+            : "Could not refresh translation progress"
         );
       } finally {
+        polling = false;
+
         if (
-          generation === generationRef.current &&
-          !controller.signal.aborted
+          !controller.signal.aborted &&
+          generation === generationRef.current
         ) {
           setLoading(false);
         }
       }
     }
 
+    // Check immediately when the book is selected.
     void loadProgress();
 
+    // Subsequent checks only read saved progress.
+    // They do not trigger additional translations.
+    const intervalId = window.setInterval(() => {
+      void loadProgress();
+    }, 3000);
+
     return () => {
-      stopRequestedRef.current = true;
-      generationRef.current++;
       controller.abort();
+      window.clearInterval(intervalId);
+      generationRef.current++;
     };
   }, [
     bookId,
@@ -162,132 +265,105 @@ export default function FullBookTranslator({
     settings.style,
     settings.contextMode,
     refreshKey,
+    acceptSnapshot,
   ]);
 
-  async function startTranslation() {
-    if (
-      activeRef.current ||
-      loading ||
-      !progress ||
-      progress.finished ||
-      progress.totalBlocks === 0
-    ) {
+  async function sendJobCommand(
+    command: "start" | "pause" | "resume"
+  ) {
+    if (actionInProgressRef.current) {
       return;
     }
 
-    activeRef.current = true;
-    stopRequestedRef.current = false;
+    const currentJobId = snapshot?.job?.id;
+
+    if (
+      command !== "start" &&
+      currentJobId === undefined
+    ) {
+      setError("No translation job exists yet.");
+      return;
+    }
+
+    actionInProgressRef.current = true;
+    requestVersionRef.current++;
 
     const generation = generationRef.current;
 
-    let currentProgress = progress;
-
-    setRunning(true);
-    setPauseRequested(false);
+    setBusy(true);
     setError("");
 
     try {
-      while (
-        !stopRequestedRef.current &&
-        !currentProgress.finished
-      ) {
-        const response = await fetch(
-          `/api/book-translation/${bookId}/next`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
+      const url =
+        command === "start"
+          ? "/api/translation-jobs"
+          : `/api/translation-jobs/${currentJobId}/${command}`;
+
+      const requestBody =
+        command === "start"
+          ? JSON.stringify({
+              bookId,
               settings,
-            }),
-          }
+            })
+          : undefined;
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: requestBody,
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseError(response)
         );
-
-        const body: unknown = await response
-          .json()
-          .catch(() => null);
-
-        // The selected book or settings changed
-        // while the request was running.
-        if (generation !== generationRef.current) {
-          break;
-        }
-
-        if (!response.ok) {
-          const message =
-            body &&
-            typeof body === "object" &&
-            "error" in body &&
-            typeof body.error === "string"
-              ? body.error
-              : `Translation failed (${response.status})`;
-
-          throw new Error(message);
-        }
-
-        const result = body as BatchResponse | null;
-
-        if (
-          !result?.progress ||
-          typeof result.progress.translatedBlocks !==
-            "number"
-        ) {
-          throw new Error(
-            "The server returned invalid progress data"
-          );
-        }
-
-        if (
-          !result.progress.finished &&
-          result.progress.translatedBlocks <=
-            currentProgress.translatedBlocks
-        ) {
-          throw new Error(
-            "Translation made no progress"
-          );
-        }
-
-        currentProgress = result.progress;
-
-        // Update the progress bar after each batch.
-        setProgress(currentProgress);
-
-        // Optionally refresh the existing chapter
-        // reader in App.tsx.
-        onBatchCompleted?.();
       }
+
+      const result: JobSnapshot =
+        await response.json();
+
+      if (generation !== generationRef.current) {
+        return;
+      }
+
+      acceptSnapshot(result);
     } catch (err) {
       if (generation === generationRef.current) {
         setError(
           err instanceof Error
             ? err.message
-            : "An unexpected translation error occurred"
+            : "Translation job command failed"
         );
       }
     } finally {
-      activeRef.current = false;
-      setRunning(false);
-      setPauseRequested(false);
+      actionInProgressRef.current = false;
+      setBusy(false);
     }
   }
 
-  function pauseTranslation() {
-    if (!activeRef.current) {
-      return;
-    }
+  const progress = snapshot?.progress;
+  const job = snapshot?.job;
 
-    // Let the current batch finish normally.
-    // The next loop iteration will not start.
-    stopRequestedRef.current = true;
-    setPauseRequested(true);
-  }
+  const status = job?.status ?? "not-started";
 
-  const nextChapterIndex =
-    progress?.chapters.findIndex(
-      (chapter) =>
-        chapter.chapterId === progress.nextChapterId
-    ) ?? -1;
+  const canStartOrResume =
+    !loading &&
+    !busy &&
+    !!progress &&
+    !progress.finished &&
+    progress.totalBlocks > 0 &&
+    status !== "running";
+
+  const nextChapterId = progress?.nextChapterId;
+
+  const nextChapterIndex = progress
+    ? progress.chapters.findIndex(
+        (chapter) =>
+          chapter.chapterId === nextChapterId
+      )
+    : -1;
 
   return (
     <section className="full-book-translator">
@@ -299,7 +375,16 @@ export default function FullBookTranslator({
         Style: {settings.style}
       </p>
 
-      {loading && <p>Loading translation progress...</p>}
+      <p role="status">
+        <strong>Status:</strong>{" "}
+        {progress?.finished
+          ? "Completed"
+          : getStatusLabel(status)}
+      </p>
+
+      {loading && (
+        <p>Loading translation progress...</p>
+      )}
 
       {progress && (
         <>
@@ -329,8 +414,8 @@ export default function FullBookTranslator({
 
           {progress.finished ? (
             <p role="status">
-              Translation complete. The book is ready
-              for EPUB export.
+              Translation complete. Refresh the EPUB
+              export status to download your book.
             </p>
           ) : progress.totalBlocks === 0 ? (
             <p>
@@ -349,39 +434,62 @@ export default function FullBookTranslator({
         </>
       )}
 
-      {running && (
+      {status === "running" && (
         <p role="status">
-          {pauseRequested
-            ? "Pausing after the current batch..."
-            : "Translating the next batch..."}
+          The server is translating this book.
+          You can close the browser and return later.
+        </p>
+      )}
+
+      {status === "paused" && (
+        <p role="status">
+          Translation is paused. The current batch
+          may still be finishing.
+        </p>
+      )}
+
+      {status === "failed" && (
+        <p role="alert">
+          Translation stopped because of an error.
+          You can review the error and resume.
+        </p>
+      )}
+
+      {job?.lastError && status === "failed" && (
+        <p className="full-book-error">
+          {job.lastError}
         </p>
       )}
 
       <div className="full-book-actions">
         <button
           type="button"
-          onClick={() => void startTranslation()}
-          disabled={
-            loading ||
-            running ||
-            !progress ||
-            progress.finished ||
-            progress.totalBlocks === 0
+          onClick={() =>
+            void sendJobCommand(
+              job ? "resume" : "start"
+            )
           }
+          disabled={!canStartOrResume}
         >
-          {progress?.translatedBlocks
-            ? "Resume translation"
-            : "Start translation"}
+          {busy
+            ? "Processing..."
+            : job
+              ? "Resume translation"
+              : "Start translation"}
         </button>
 
         <button
           type="button"
-          onClick={pauseTranslation}
-          disabled={!running || pauseRequested}
+          onClick={() =>
+            void sendJobCommand("pause")
+          }
+          disabled={
+            busy ||
+            loading ||
+            status !== "running"
+          }
         >
-          {pauseRequested
-            ? "Pausing..."
-            : "Pause translation"}
+          Pause translation
         </button>
 
         <button
@@ -389,7 +497,7 @@ export default function FullBookTranslator({
           onClick={() => {
             setRefreshKey((value) => value + 1);
           }}
-          disabled={loading || running}
+          disabled={loading || busy}
         >
           Refresh progress
         </button>
@@ -403,3 +511,4 @@ export default function FullBookTranslator({
     </section>
   );
 }
+

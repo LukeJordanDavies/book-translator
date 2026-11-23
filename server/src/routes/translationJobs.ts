@@ -168,6 +168,65 @@ router.post("/", (req, res) => {
   }
 });
 
+// GET /api/translation-jobs/by-book/:bookId
+router.get("/by-book/:bookId", (req, res) => {
+  const bookId = parseId(req.params.bookId);
+
+  if (bookId === null) {
+    res.status(400).json({
+      error: "Invalid book ID",
+    });
+    return;
+  }
+
+  const settings = {
+    targetLanguage: req.query.targetLanguage,
+    style: req.query.style,
+    contextMode: req.query.contextMode,
+  };
+
+  if (!isValidSettings(settings)) {
+    res.status(400).json({
+      error: "Invalid translation settings",
+    });
+    return;
+  }
+
+  try {
+    const progress = getBookTranslationProgress(
+      bookId,
+      settings
+    );
+
+    if (!progress) {
+      res.status(404).json({
+        error: "Book not found",
+      });
+      return;
+    }
+
+    const job =
+      translationJobRepository.getByBookAndSettings(
+        bookId,
+        settings
+      );
+
+    res.json({
+      job,
+      progress,
+    });
+  } catch (error) {
+    console.error(
+      "Failed to retrieve translation job:",
+      error
+    );
+
+    res.status(500).json({
+      error: "Failed to retrieve translation job"
+    });
+  }
+});
+
 // GET /api/translation-jobs/:jobId
 router.get("/:jobId", (req, res) => {
   const jobId = parseId(req.params.jobId);
