@@ -11,6 +11,7 @@ import {
 
 import {
   launchTranslationJob,
+  isTranslationJobActive,
 } from "../services/translationJobWorker.js";
 
 import type {
@@ -146,13 +147,38 @@ router.post("/", (req, res) => {
         job.id,
         "completed"
       );
-    } else {
+    } else if (
+      !(
+        job.status === "running" &&
+        isTranslationJobActive(job.id)
+      )
+    ) {
       translationJobRepository.setStatus(
         job.id,
         "running"
       );
 
-      launchTranslationJob(job.id);
+      const launched =
+        launchTranslationJob(job.id);
+
+      if (
+        !launched &&
+        !isTranslationJobActive(job.id)
+      ) {
+        translationJobRepository.setStatus(
+          job.id,
+          "paused",
+          "Another translation operation is active " +
+          "for this book and settings."
+        );
+
+        res.status(409).json({
+          error:
+            "Another translation operation is already " +
+            "processing this book and settings.",
+        });
+        return;
+      }
     }
 
     res.json(getJobSnapshot(job.id));
@@ -355,7 +381,30 @@ router.post("/:jobId/resume", (req, res) => {
         "running"
       );
 
-      launchTranslationJob(jobId);
+      const launched =
+        launchTranslationJob(jobId);
+
+      // An active worker for this same job is fine:
+      // it may still be finishing a batch after
+      // a quick Pause -> Resume.
+      if (
+        !launched &&
+        !isTranslationJobActive(jobId)
+      ) {
+        translationJobRepository.setStatus(
+          jobId,
+          "paused",
+          "Another translation operation is active " +
+          "for this book and settings."
+        );
+
+        res.status(409).json({
+          error:
+            "Another translation operation is already " +
+            "processing this book and settings.",
+        });
+        return;
+      }
     }
 
     res.json(getJobSnapshot(jobId));

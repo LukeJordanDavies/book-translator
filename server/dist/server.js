@@ -7,6 +7,7 @@ import exportRoutes from "./routes/exports.js";
 import bookTranslationRoutes from "./routes/bookTranslation.js";
 import translationJobRoutes from "./routes/translationJobs.js";
 import { translationJobRepository, } from "./database/translationJobRepository.js";
+import { translationProcessingGuard, } from "./middleware/translationProcessingGuard.js";
 dotenv.config();
 const app = express();
 const PORT = 3001;
@@ -19,7 +20,7 @@ app.get("/api/health", (_req, res) => {
     });
 });
 app.use("/api/books", bookRoutes);
-app.use("/api/translations", translationRoutes);
+app.use("/api/translations", translationProcessingGuard, translationRoutes);
 app.use("/api/exports", exportRoutes);
 app.use("/api/book-translation", bookTranslationRoutes);
 app.use("/api/translation-jobs", translationJobRoutes);

@@ -442,10 +442,15 @@ export default function FullBookTranslator({
       )}
 
       {status === "paused" && (
-        <p role="status">
-          Translation is paused. The current batch
-          may still be finishing.
-        </p>
+        <div role="status">
+          <p>
+            Translation is paused. 
+          </p>
+
+          {job?.lastError && (
+            <p>{job.lastError}</p>
+          )}
+        </div>
       )}
 
       {status === "failed" && (
