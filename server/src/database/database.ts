@@ -161,4 +161,43 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS translation_glossary (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    book_id INTEGER NOT NULL,
+    target_language TEXT NOT NULL,
+
+    source_term TEXT NOT NULL COLLATE NOCASE,
+    translated_term TEXT NOT NULL,
+
+    category TEXT NOT NULL DEFAULT 'term'
+      CHECK (
+        category IN (
+          'character',
+          'place',
+          'term'
+        )
+      ),
+
+    notes TEXT NOT NULL DEFAULT '',
+
+    created_at TEXT NOT NULL
+      DEFAULT CURRENT_TIMESTAMP,
+
+    updated_at TEXT NOT NULL
+      DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (book_id)
+      REFERENCES books(id)
+      ON DELETE CASCADE,
+
+    UNIQUE (
+      book_id,
+      target_language,
+      source_term
+    )
+  );
+`);
+
 export default db;
