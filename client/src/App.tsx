@@ -7,6 +7,7 @@ import ChapterTranslator from "./components/ChapterTranslator";
 import ChapterReader from "./components/ChapterReader";
 import EpubExporter from "./components/EpubExporter";
 import FullBookTranslator from "./components/FullBookTranslator";
+import GlossaryEditor from "./components/GlossaryEditor";
 
 import type { TranslationOptions } from "./components/TranslationSettings";
 
@@ -107,6 +108,15 @@ function App() {
         />
       )}
 
+      {selectedBook && (
+        <GlossaryEditor
+          key={`${selectedBook.id}-${translationSettings.targetLanguage}`}
+          bookId={selectedBook.id}
+          targetLanguage={
+            translationSettings.targetLanguage
+          }
+        />
+      )}
 
       {loadingBook && <p>Loading book...</p>}
       {error && <p>{error}</p>}
