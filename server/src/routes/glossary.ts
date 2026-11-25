@@ -6,6 +6,8 @@ import {
   type SaveGlossaryEntryInput,
 } from "../database/glossaryRepository.js";
 
+import {isBookLanguageTranslationLocked,} from "../services/translationProcessingLock.js";
+
 const router = Router({
   mergeParams: true,
 });
@@ -177,6 +179,22 @@ router.post<{ bookId: string }>("/", (req, res) => {
       return;
     }
 
+    if (
+      isBookLanguageTranslationLocked(
+        bookId,
+        targetLanguage
+      )
+    ) {
+      res.status(409).json({
+        error:
+          "This glossary cannot be edited while " +
+          "a translation is running. " +
+          "Pause the job and allow its current " +
+          "batch to finish first.",
+      });
+      return;
+    }
+
     const entry = glossaryRepository.save(input);
 
     res.json({ entry });
@@ -212,6 +230,20 @@ router.delete<{ bookId: string; entryId: string; }>("/:entryId", (req, res) => {
     if (!entry || entry.bookId !== bookId) {
       res.status(404).json({
         error: "Glossary entry not found",
+      });
+      return;
+    }
+
+    if (
+      isBookLanguageTranslationLocked(
+        bookId,
+        entry.targetLanguage
+      )
+    ) {
+      res.status(409).json({
+        error:
+          "This glossary cannot be edited while " +
+          "a translation is running.",
       });
       return;
     }

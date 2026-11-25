@@ -9,6 +9,7 @@ import translationJobRoutes from "./routes/translationJobs.js";
 import {translationJobRepository,} from "./database/translationJobRepository.js";
 import {translationProcessingGuard,} from "./middleware/translationProcessingGuard.js";
 import glossaryRoutes from "./routes/glossary.js";
+import glossaryRetranslationRoutes from "./routes/glossaryRetranslation.js";
 
 
 dotenv.config();
@@ -33,6 +34,7 @@ app.use("/api/translations", translationProcessingGuard, translationRoutes);
 app.use("/api/exports", exportRoutes);
 app.use("/api/book-translation", bookTranslationRoutes);
 app.use("/api/translation-jobs", translationJobRoutes);
+app.use("/api/glossary-retranslation", glossaryRetranslationRoutes);
 
 // A process restart interrupts in-flight jobs.
 // Their completed blocks remain saved in SQLite.

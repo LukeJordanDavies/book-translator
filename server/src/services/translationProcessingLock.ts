@@ -50,3 +50,31 @@ export function isTranslationLocked(
     createLockKey(bookId, settings)
   );
 }
+
+
+export function isBookLanguageTranslationLocked(
+  bookId: number,
+  targetLanguage: string
+): boolean {
+  for (const key of activeTranslations) {
+    const [
+      lockedBookId,
+      lockedLanguage,
+    ] = JSON.parse(key) as [
+      number,
+      string,
+      string,
+      string
+    ];
+
+    if (
+      lockedBookId === bookId &&
+      lockedLanguage === targetLanguage
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+

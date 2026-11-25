@@ -8,6 +8,7 @@ import ChapterReader from "./components/ChapterReader";
 import EpubExporter from "./components/EpubExporter";
 import FullBookTranslator from "./components/FullBookTranslator";
 import GlossaryEditor from "./components/GlossaryEditor";
+import GlossaryRetranslation from "./components/GlossaryRetranslation";
 
 import type { TranslationOptions } from "./components/TranslationSettings";
 
@@ -115,6 +116,19 @@ function App() {
           targetLanguage={
             translationSettings.targetLanguage
           }
+        />
+      )}
+
+      {selectedBook && (
+        <GlossaryRetranslation
+          key={`${selectedBook.id}-${translationSettings.targetLanguage}-${translationSettings.style}-${translationSettings.contextMode}`}
+          bookId={selectedBook.id}
+          settings={translationSettings}
+          onTranslationsChanged={() => {
+            setTranslationRefreshKey(
+              (current) => current + 1
+            );
+          }}
         />
       )}
 
