@@ -12,8 +12,8 @@ import {
 } from "../database/translationRepository.js";
 
 import { getSavedChapterTranslations } from "../database/translationRepository.js";
-
 import { translateChapterBatch } from "../services/chapterTranslationService.js";
+import { getBookIdForTranslationBlock, } from "../services/glossaryContextService.js";
 
 const router = Router();
 
@@ -196,7 +196,16 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    const result = await translateFormattedText(block.html, settings);
+    const owningBookId =
+      getBookIdForTranslationBlock(blockId);
+
+    if (owningBookId === null) {
+      throw new Error(
+        `Could not find owning book for block ${blockId}`
+      );
+    }
+
+    const result = await translateFormattedText(block.html, settings, undefined, owningBookId);
 
     saveTranslation(key, result.translatedText, result.translatedHtml);
 

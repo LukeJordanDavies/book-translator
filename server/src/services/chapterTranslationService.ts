@@ -54,7 +54,8 @@ export async function translateChapterBatch(
     const result = await translateFormattedText(
       block.html,
       settings,
-      previousContext
+      previousContext,
+      bookId
     );
 
     saveTranslation(
