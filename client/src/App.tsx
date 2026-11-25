@@ -9,6 +9,7 @@ import EpubExporter from "./components/EpubExporter";
 import FullBookTranslator from "./components/FullBookTranslator";
 import GlossaryEditor from "./components/GlossaryEditor";
 import GlossaryRetranslation from "./components/GlossaryRetranslation";
+import TranslationQualityReport from "./components/TranslationQualityReport";
 
 import type { TranslationOptions } from "./components/TranslationSettings";
 
@@ -213,6 +214,13 @@ function App() {
                     (current) => current + 1
                   );
                 }}
+              />
+
+              <TranslationQualityReport
+                key={`${selectedBook.id}-${translationSettings.targetLanguage}-${translationSettings.style}-${translationSettings.contextMode}`}
+                bookId={selectedBook.id}
+                settings={translationSettings}
+                refreshKey={translationRefreshKey}
               />
 
               <EpubExporter
