@@ -12,6 +12,11 @@ import {
   generateTranslatedEpub,
 } from "../services/epubExportService.js";
 
+import {
+  epubExportDiagnosticsService,
+  getEpubIntegrityErrorResponse,
+} from "../services/epubExportDiagnosticsService.js";
+
 const router = Router();
 
 const languages = new Set([
@@ -88,6 +93,122 @@ router.post("/validate", (req, res) => {
 export default router;
 
 
+// POST /api/exports/reference-report
+router.post(
+  "/reference-report",
+  async (req, res) => {
+    const bookId: unknown =
+      req.body?.bookId;
+
+    const settings: unknown =
+      req.body?.settings;
+
+    const supportedLanguages = new Set([
+      "English",
+      "French",
+      "Spanish",
+      "German",
+      "Italian",
+      "Japanese",
+    ]);
+
+    function validSettings(
+      value: unknown
+    ): value is TranslationOptions {
+      if (
+        !value ||
+        typeof value !== "object" ||
+        Array.isArray(value)
+      ) {
+        return false;
+      }
+
+      const candidate =
+        value as Record<string, unknown>;
+
+      return (
+        typeof candidate.targetLanguage ===
+          "string" &&
+        supportedLanguages.has(
+          candidate.targetLanguage
+        ) &&
+        (
+          candidate.style === "literary" ||
+          candidate.style === "faithful"
+        ) &&
+        (
+          candidate.contextMode === "previous" ||
+          candidate.contextMode === "none"
+        )
+      );
+    }
+
+    if (
+      typeof bookId !== "number" ||
+      !Number.isSafeInteger(bookId) ||
+      bookId < 1 ||
+      !validSettings(settings)
+    ) {
+      res.status(400).json({
+        error:
+          "Invalid book ID or translation settings",
+      });
+      return;
+    }
+
+    try {
+      // Avoid reconstructing incomplete books.
+      const completeness =
+        await validateBookForExport(
+          bookId,
+          settings
+        );
+
+      if (!completeness.ready) {
+        res.status(409).json({
+          code: "EXPORT_INCOMPLETE",
+          error:
+            "Complete the missing translations " +
+            "before inspecting the final EPUB.",
+          status: completeness,
+        });
+        return;
+      }
+
+      const result =
+        await epubExportDiagnosticsService
+          .inspect(bookId, settings);
+
+      // A reference-validation failure is
+      // a reportable result, not a lost report.
+      res.json(result);
+    } catch (error) {
+      console.error(
+        "EPUB integrity inspection failed:",
+        error
+      );
+
+      if (
+        error instanceof Error &&
+        error.message === "BOOK_NOT_FOUND"
+      ) {
+        res.status(404).json({
+          error: "Book not found",
+        });
+        return;
+      }
+
+      res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not inspect the EPUB",
+      });
+    }
+  }
+);
+
+
 router.post("/download", async (req, res) => {
   const { bookId, settings } = req.body ?? {};
 
@@ -129,6 +250,14 @@ router.post("/download", async (req, res) => {
     res.send(epubBuffer);
   } catch (error) {
     console.error("EPUB export failed:", error);
+
+    const integrityError =
+      getEpubIntegrityErrorResponse(error);
+
+    if (integrityError) {
+      res.status(422).json(integrityError);
+      return;
+    }
 
     if (
       error instanceof Error &&

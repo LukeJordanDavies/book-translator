@@ -24,16 +24,33 @@ export interface EpubReferenceReport {
   issues: EpubReferenceIssue[];
 }
 
-const MAX_STORED_ISSUES = 50;
+export class EpubReferenceValidationError extends Error {
+  readonly code = "EPUB_REFERENCE_VALIDATION_FAILED";
 
-const XHTML_EXTENSION =
-  /\.(?:xhtml|html|htm)$/i;
+  constructor(public readonly report: EpubReferenceReport) {
+    const details = report.issues
+      .slice(0, 5)
+      .map((issue) => {
+        const reference = issue.reference
+          ? ` (${issue.reference})`
+          : "";
 
-const URL_SCHEME =
-  /^[a-z][a-z0-9+.-]*:/i;
+        return `${issue.file}: ${issue.message}${reference}`;
+      })
+      .join("\n");
 
-const UNSAFE_SCHEME =
-  /^(?:javascript|vbscript|file):/i;
+    super(
+      `EPUB reference validation failed: ${report.totalIssues} issue(s).` +
+        (details ? `\n${details}` : "")
+    );
+
+    this.name = "EpubReferenceValidationError";
+  }
+}
+
+const XHTML_EXTENSION = /\.(?:xhtml|html|htm)$/i;
+const URL_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+const UNSAFE_SCHEME = /^(?:javascript|vbscript|file):/i;
 
 function isXhtmlFile(filename: string): boolean {
   return XHTML_EXTENSION.test(filename);
@@ -48,67 +65,50 @@ function resolveReference(
   sourceFile: string,
   reference: string
 ): ResolvedReference {
-  // Separate the fragment BEFORE decoding the
-  // path, because encoded '#' may occur in
-  // legitimate filenames.
+  // Separate the fragment before decoding the path: an encoded # can
+  // legitimately be part of a filename.
   const hashIndex = reference.indexOf("#");
 
   const withoutFragment =
-    hashIndex === -1
-      ? reference
-      : reference.slice(0, hashIndex);
+    hashIndex === -1 ? reference : reference.slice(0, hashIndex);
 
   const encodedFragment =
-    hashIndex === -1
-      ? ""
-      : reference.slice(hashIndex + 1);
+    hashIndex === -1 ? "" : reference.slice(hashIndex + 1);
 
-  const encodedPath =
-    withoutFragment.split("?")[0];
+  // Query strings are not part of a resource's ZIP path.
+  const encodedPath = withoutFragment.split("?")[0];
 
-  const decodedPath =
-    decodeURIComponent(encodedPath);
-
-  const fragment =
-    decodeURIComponent(encodedFragment);
+  // Invalid percent escapes will throw; the caller reports them as
+  // invalid references instead of crashing the whole scan.
+  const decodedPath = decodeURIComponent(encodedPath);
+  const fragment = decodeURIComponent(encodedFragment);
 
   const filename =
     decodedPath === ""
       ? sourceFile
       : decodedPath.startsWith("/")
-        ? path.posix.normalize(
-            decodedPath.slice(1)
-          )
+        ? path.posix.normalize(decodedPath.slice(1))
         : path.posix.normalize(
-            path.posix.join(
-              path.posix.dirname(sourceFile),
-              decodedPath
-            )
+            path.posix.join(path.posix.dirname(sourceFile), decodedPath)
           );
 
   if (
     filename === "" ||
+    filename === "." ||
     filename === ".." ||
     filename.startsWith("../") ||
     filename.startsWith("/")
   ) {
-    throw new Error(
-      "Reference resolves outside the EPUB archive"
-    );
+    throw new Error("Reference resolves outside the EPUB archive");
   }
 
-  return {
-    filename,
-    fragment,
-  };
+  return { filename, fragment };
 }
-
 
 export async function inspectEpubReferences(
   zip: JSZip
 ): Promise<EpubReferenceReport> {
   const issues: EpubReferenceIssue[] = [];
-
   let totalIssues = 0;
   let localReferencesChecked = 0;
 
@@ -117,17 +117,15 @@ export async function inspectEpubReferences(
     file: string,
     reference: string,
     message: string
-  ) {
+  ): void {
     totalIssues++;
 
-    if (issues.length < MAX_STORED_ISSUES) {
-      issues.push({
-        kind,
-        file,
-        reference,
-        message,
-      });
-    }
+    issues.push({
+      kind,
+      file,
+      reference,
+      message,
+    });
   }
 
   const archiveFiles = new Set(
@@ -136,8 +134,8 @@ export async function inspectEpubReferences(
       .map(([filename]) => filename)
   );
 
-  // Store parsed XHTML documents so links to
-  // other chapters can be checked for IDs.
+  // Store parsed XHTML documents and their IDs so links to other chapters
+  // can be validated even when the destination is read later in the ZIP.
   const documents = new Map<
     string,
     {
@@ -146,25 +144,19 @@ export async function inspectEpubReferences(
     }
   >();
 
-  // First pass: load XHTML documents and
-  // collect every element ID.
+  // First pass: read XHTML and collect element IDs and older named anchors.
   for (const filename of archiveFiles) {
     if (!isXhtmlFile(filename)) {
       continue;
     }
 
     const entry = zip.file(filename);
-
     if (!entry) {
       continue;
     }
 
     const xhtml = await entry.async("string");
-
-    const $ = cheerio.load(xhtml, {
-      xmlMode: true,
-    });
-
+    const $ = cheerio.load(xhtml, { xmlMode: true });
     const htmlElement = $("html").first();
 
     if (
@@ -182,34 +174,26 @@ export async function inspectEpubReferences(
 
     const ids = new Set<string>();
 
-    $.root().find("*").each(
-      (_index, element) => {
+    $.root()
+      .find("*")
+      .each((_index, element) => {
         const id =
-        $(element).attr("id") ??
-        $(element).attr("xml:id");
+          $(element).attr("id") ?? $(element).attr("xml:id");
 
         if (id) {
-        ids.add(id);
+          ids.add(id);
         }
 
-        // Older EPUB documents sometimes use
-        // named anchors instead of element IDs.
-        if (
-        element.tagName.toLowerCase() === "a"
-        ) {
-        const name = $(element).attr("name");
-
-        if (name) {
+        // Some older EPUB 2 books reference <a name="..."> anchors.
+        if (element.tagName.toLowerCase() === "a") {
+          const name = $(element).attr("name");
+          if (name) {
             ids.add(name);
+          }
         }
-        }
-      }
-    );
+      });
 
-    documents.set(filename, {
-      $,
-      ids,
-    });
+    documents.set(filename, { $, ids });
   }
 
   if (documents.size === 0) {
@@ -221,38 +205,26 @@ export async function inspectEpubReferences(
     );
   }
 
-  // Second pass: inspect links and resources
-  // once every document's IDs are known.
+  // Second pass: check local references against the archive and target IDs.
   for (const [filename, document] of documents) {
     const $ = document.$;
 
-    $.root().find("*").each(
-      (_index, element) => {
-        const tagName =
-          element.tagName
-            .split(":")
-            .pop()
-            ?.toLowerCase();
-
+    $.root()
+      .find("*")
+      .each((_index, element) => {
+        const tagName = element.tagName.split(":").pop()?.toLowerCase();
         let reference: string | undefined;
 
         if (tagName === "a" || tagName === "link") {
           reference = $(element).attr("href");
         } else if (tagName === "img") {
           reference = $(element).attr("src");
-        } else if (
-          tagName === "image" ||
-          tagName === "use"
-        ) {
+        } else if (tagName === "image" || tagName === "use") {
           reference =
-            $(element).attr("href") ??
-            $(element).attr("xlink:href");
+            $(element).attr("href") ?? $(element).attr("xlink:href");
         }
 
-        if (
-          reference === undefined ||
-          reference.trim() === ""
-        ) {
+        if (reference === undefined || reference.trim() === "") {
           return;
         }
 
@@ -268,32 +240,23 @@ export async function inspectEpubReferences(
           return;
         }
 
-        // Skip external URLs, mailto links,
-        // embedded data URIs and similar schemes.
-        if (
-          URL_SCHEME.test(value) ||
-          value.startsWith("//")
-        ) {
+        // Absolute web URLs, mailto links and embedded data URIs are not
+        // files within the EPUB ZIP, so they aren't checked here.
+        if (URL_SCHEME.test(value) || value.startsWith("//")) {
           return;
         }
 
         localReferencesChecked++;
 
         let resolved: ResolvedReference;
-
         try {
-          resolved = resolveReference(
-            filename,
-            value
-          );
+          resolved = resolveReference(filename, value);
         } catch (error) {
           addIssue(
             "invalid_reference",
             filename,
             value,
-            error instanceof Error
-              ? error.message
-              : "Invalid local reference."
+            error instanceof Error ? error.message : "Invalid local reference."
           );
           return;
         }
@@ -303,43 +266,30 @@ export async function inspectEpubReferences(
             "missing_resource",
             filename,
             value,
-            `Referenced file is missing: ` +
-            resolved.filename
+            `Referenced file is missing: ${resolved.filename}`
           );
           return;
         }
 
-        // Fragment identifiers in XHTML should
-        // point to an existing element ID.
-        //
-        // EPUB CFI fragments use a separate
-        // addressing scheme, so skip ID checks
-        // for those.
+        // EPUB CFI fragments don't use element IDs. Ordinary fragments
+        // pointing into XHTML must match an existing ID or named anchor.
         if (
           resolved.fragment &&
           isXhtmlFile(resolved.filename) &&
-          !resolved.fragment.startsWith(
-            "epubcfi("
-          )
+          !resolved.fragment.startsWith("epubcfi(")
         ) {
-          const target =
-            documents.get(resolved.filename);
+          const target = documents.get(resolved.filename);
 
-          if (
-            target &&
-            !target.ids.has(resolved.fragment)
-          ) {
+          if (target && !target.ids.has(resolved.fragment)) {
             addIssue(
               "missing_fragment",
               filename,
               value,
-              `Element ID "${resolved.fragment}" ` +
-              `was not found in ${resolved.filename}`
+              `Element ID "${resolved.fragment}" was not found in ${resolved.filename}`
             );
           }
         }
-      }
-    );
+      });
   }
 
   return {
@@ -354,30 +304,10 @@ export async function assertEpubReferences(
   epubBuffer: Buffer
 ): Promise<EpubReferenceReport> {
   const zip = await JSZip.loadAsync(epubBuffer);
-
-  const report = await inspectEpubReferences(
-    zip
-  );
+  const report = await inspectEpubReferences(zip);
 
   if (report.totalIssues > 0) {
-    const details = report.issues
-      .slice(0, 10)
-      .map(
-        (issue) =>
-          `${issue.file}: ${issue.message}` +
-          (
-            issue.reference
-              ? ` (${issue.reference})`
-              : ""
-          )
-      )
-      .join("\n");
-
-    throw new Error(
-      `EPUB reference validation failed: ` +
-      `${report.totalIssues} issue(s).\n` +
-      details
-    );
+    throw new EpubReferenceValidationError(report);
   }
 
   return report;
