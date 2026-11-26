@@ -1,0 +1,108 @@
+.epub-export-diagnostics {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #aaa;
+  border-radius: 10px;
+}
+
+.epub-export-diagnostics h3 {
+  margin-top: 0;
+}
+
+.epub-export-completeness {
+  margin: 18px 0;
+}
+
+.epub-export-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.epub-export-buttons button,
+.epub-integrity-report > button {
+  padding: 10px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.epub-export-buttons button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.epub-integrity-report {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+}
+
+.epub-integrity-report h4 {
+  margin-top: 0;
+}
+
+.epub-integrity-stats {
+  display: grid;
+  grid-template-columns: repeat(
+    3,
+    minmax(0, 1fr)
+  );
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.epub-integrity-stats p {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #aaa;
+  border-radius: 6px;
+}
+
+.epub-integrity-issues {
+  max-height: 480px;
+  overflow-y: auto;
+  padding-left: 28px;
+  margin: 18px 0;
+}
+
+.epub-integrity-issues li {
+  padding: 14px 10px;
+  border-bottom: 1px solid #aaa;
+}
+
+.epub-integrity-issues p {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+
+.epub-integrity-issues code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.epub-integrity-report summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.epub-export-help {
+  font-size: 0.875rem;
+  opacity: 0.75;
+}
+
+.epub-export-error {
+  color: #c0392b;
+  margin-top: 16px;
+}
+
+@media (max-width: 650px) {
+  .epub-export-diagnostics {
+    padding: 14px;
+  }
+
+  .epub-integrity-stats {
+    grid-template-columns: 1fr;
+  }
+}
