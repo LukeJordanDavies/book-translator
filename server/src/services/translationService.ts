@@ -25,6 +25,10 @@ import {
   formatGlossaryForPrompt,
 } from "./glossaryContextService.js";
 
+import {
+  getTranslationStyleGuidance,
+} from "./translationStylePrompt.js";
+
 export interface TranslationOptions {
   targetLanguage: string;
   style: "literary" | "faithful";
@@ -132,7 +136,10 @@ Glossary rules:
 
   const response = await client.responses.create({
     model: "gpt-6-luna",
-    instructions,
+    instructions: [
+      instructions,
+      getTranslationStyleGuidance(settings.style),
+    ].join("\n\n"),
     input:
       `${context}` +
       `${glossaryContext}` +
