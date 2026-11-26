@@ -29,6 +29,10 @@ import {
   getTranslationStyleGuidance,
 } from "./translationStylePrompt.js";
 
+import {
+  improveLiterarySegments,
+} from "./literarySegmentationService.js";
+
 export interface TranslationOptions {
   targetLanguage: string;
   style: "literary" | "faithful";
@@ -185,10 +189,77 @@ export async function translateFormattedText(
       glossaryEntries
     );
 
-  const segments = splitTextIntoSegments(
+  
+  const originalSegments = splitTextIntoSegments(
     prepared.text,
     3000
   );
+
+  // Convert the existing TextSegment objects
+  // into complete text chunks for the
+  // literary segmentation service.
+  const originalChunks = originalSegments.map(
+    (segment) =>
+      segment.text + (segment.separator ?? "")
+  );
+
+  const improvedChunks = improveLiterarySegments(
+    originalChunks
+  );
+
+  // Detect whether any boundaries changed.
+  const boundariesChanged =
+    improvedChunks.length !== originalChunks.length ||
+    improvedChunks.some(
+      (chunk, index) =>
+        chunk !== originalChunks[index]
+    );
+
+  // Convert the improved chunks back into
+  // TextSegment objects.
+  //
+  // Trailing whitespace becomes the separator,
+  // so it is preserved outside the translated text.
+  const improvedSegments = improvedChunks.map(
+    (chunk) => {
+      const separator =
+        chunk.match(/\s+$/u)?.[0] ?? "";
+
+      return {
+        text: chunk.slice(
+          0,
+          chunk.length - separator.length
+        ),
+        separator,
+      };
+    }
+  );
+
+  // Only use the improved segments when they
+  // preserve the original text, stay within
+  // the 3000-character limit, and do not
+  // change non-whitespace separators.
+  const segments =
+    boundariesChanged &&
+    originalSegments.every(
+      (segment) =>
+        /^\s*$/u.test(segment.separator ?? "")
+    ) &&
+    originalChunks.join("") === prepared.text &&
+    improvedSegments.every(
+      (segment) =>
+        segment.text.length > 0 &&
+        segment.text.length <= 3000
+    ) &&
+    improvedSegments
+      .map(
+        (segment) =>
+          segment.text + segment.separator
+      )
+      .join("") === prepared.text
+      ? improvedSegments
+      : originalSegments;
+
 
   const translatedSegments: TextSegment[] = [];
 
