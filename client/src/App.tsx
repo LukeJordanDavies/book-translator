@@ -10,6 +10,7 @@ import FullBookTranslator from "./components/FullBookTranslator";
 import GlossaryEditor from "./components/GlossaryEditor";
 import GlossaryRetranslation from "./components/GlossaryRetranslation";
 import TranslationQualityReport from "./components/TranslationQualityReport";
+import ExportReadinessGate from "./components/ExportReadinessGate";
 
 import type { TranslationOptions } from "./components/TranslationSettings";
 
@@ -222,12 +223,21 @@ function App() {
                 settings={translationSettings}
                 refreshKey={translationRefreshKey}
               />
+            </>
+          )}
 
+          {selectedBook && (
+            <ExportReadinessGate
+              key={`${selectedBook.id}-${translationSettings.targetLanguage}-${translationSettings.style}-${translationSettings.contextMode}`}
+              bookId={selectedBook.id}
+              settings={translationSettings}
+              refreshKey={translationRefreshKey}
+            >
               <EpubExporter
                 bookId={selectedBook.id}
                 settings={translationSettings}
               />
-            </>
+            </ExportReadinessGate>
           )}
 
           {paragraphToTranslate && (

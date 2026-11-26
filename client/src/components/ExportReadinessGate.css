@@ -1,0 +1,152 @@
+.export-readiness-gate {
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid #aaa;
+  border-radius: 12px;
+}
+
+.export-readiness-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.export-readiness-heading h3 {
+  margin: 0 0 8px;
+}
+
+.export-readiness-heading button,
+.export-readiness-actions button,
+.export-readiness-hide {
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.export-readiness-heading button:disabled,
+.export-readiness-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.export-readiness-summary {
+  display: grid;
+  grid-template-columns: repeat(
+    4,
+    minmax(0, 1fr)
+  );
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.export-readiness-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+}
+
+.export-readiness-summary span {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.export-readiness-summary strong {
+  font-size: 1.35rem;
+}
+
+.export-readiness-progress {
+  display: block;
+  width: 100%;
+  height: 12px;
+  margin-top: 18px;
+}
+
+.export-readiness-status {
+  margin-top: 20px;
+  font-weight: 600;
+}
+
+.export-readiness-help {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.export-readiness-blockers,
+.export-readiness-warnings,
+.export-readiness-notice {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+}
+
+.export-readiness-blockers h4,
+.export-readiness-warnings h4 {
+  margin: 0 0 12px;
+}
+
+.export-readiness-blockers ul,
+.export-readiness-warnings ul {
+  padding-left: 24px;
+}
+
+.export-readiness-error {
+  color: #c0392b;
+  margin-top: 16px;
+}
+
+.export-readiness-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.export-readiness-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.export-readiness-confirm input {
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.export-readiness-download {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid #aaa;
+}
+
+.export-readiness-hide {
+  margin-top: 16px;
+}
+
+@media (max-width: 800px) {
+  .export-readiness-heading {
+    flex-direction: column;
+  }
+
+  .export-readiness-summary {
+    grid-template-columns: repeat(
+      2,
+      minmax(0, 1fr)
+    );
+  }
+}
+
+@media (max-width: 500px) {
+  .export-readiness-gate {
+    padding: 16px;
+  }
+
+  .export-readiness-summary {
+    grid-template-columns: 1fr;
+  }
+}
