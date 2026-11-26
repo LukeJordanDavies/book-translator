@@ -18,6 +18,8 @@ type IssueKind =
   | "glossary_inconsistency";
 
 interface QualityIssue {
+  issueId: string;
+  reviewed: boolean;
   kind: IssueKind;
   blockId: number;
   chapterTitle: string;
@@ -34,6 +36,8 @@ interface QualityReport {
   missingBlocks: number;
   totalIssues: number;
   displayLimit: number;
+  reviewedVisibleIssues: number;
+  unreviewedVisibleIssues: number;
   issueCounts: Record<IssueKind, number>;
   issues: QualityIssue[];
 }
@@ -93,7 +97,12 @@ export default function TranslationQualityReport({
     useState(0);
 
   const [filter, setFilter] =
-    useState<IssueKind | "all">("all");
+    useState<
+      IssueKind | "all" | "unreviewed"
+    >("all");
+  
+  const [updatingIssueId, setUpdatingIssueId] =
+    useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -159,12 +168,65 @@ export default function TranslationQualityReport({
     refreshVersion,
   ]);
 
+  async function toggleReviewed(
+    issue: QualityIssue
+  ) {
+    if (updatingIssueId !== null) {
+      return;
+    }
+
+    setUpdatingIssueId(issue.issueId);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/translation-quality/${bookId}/reviews`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            settings,
+            issueId: issue.issueId,
+            reviewed: !issue.reviewed,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await getApiError(response)
+        );
+      }
+
+      // Retrieve the updated status from SQLite.
+      setRefreshVersion(
+        (current) => current + 1
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not update review status"
+      );
+    } finally {
+      setUpdatingIssueId(null);
+    }
+  }
+
   const visibleIssues = report
-    ? report.issues.filter(
-        (issue) =>
-          filter === "all" ||
-          issue.kind === filter
-      )
+    ? report.issues.filter((issue) => {
+        if (filter === "all") {
+          return true;
+        }
+
+        if (filter === "unreviewed") {
+          return !issue.reviewed;
+        }
+
+        return issue.kind === filter;
+      })
     : [];
 
   const completionPercentage =
@@ -268,6 +330,24 @@ export default function TranslationQualityReport({
             aria-label="Translation completion"
           />
 
+          <p className="quality-reviewed-count">
+            <strong>
+              {report.reviewedVisibleIssues}
+            </strong>
+            {" "}of{" "}
+            <strong>
+              {report.issues.length}
+            </strong>
+            {" "}displayed warnings reviewed.
+
+            {report.totalIssues > report.issues.length && (
+              <span>
+                {" "}Additional warnings exist beyond
+                the first {report.displayLimit}.
+              </span>
+            )}
+          </p>
+
           {report.missingBlocks > 0 && (
             <p className="quality-warning">
               This book still has untranslated
@@ -287,12 +367,16 @@ export default function TranslationQualityReport({
               onChange={(event) =>
                 setFilter(
                   event.target.value as
-                    IssueKind | "all"
+                    IssueKind | "all" | "unreviewed"
                 )
               }
             >
               <option value="all">
                 All warnings
+              </option>
+
+              <option value="unreviewed">
+                Unreviewed only
               </option>
 
               {(
@@ -387,6 +471,32 @@ export default function TranslationQualityReport({
                           </p>
                         </div>
                       )}
+
+                      <div className="quality-review-actions">
+                        {issue.reviewed && (
+                          <span className="quality-reviewed-label">
+                            Reviewed
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          disabled={
+                            loading ||
+                            updatingIssueId !== null
+                          }
+                          onClick={() => {
+                            void toggleReviewed(issue);
+                          }}
+                        >
+                          {updatingIssueId === issue.issueId
+                            ? "Saving..."
+                            : issue.reviewed
+                              ? "Reopen warning"
+                              : "Mark reviewed"}
+                        </button>
+                      </div>
+
                     </article>
                   )
                 )}

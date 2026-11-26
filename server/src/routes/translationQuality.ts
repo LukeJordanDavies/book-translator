@@ -1,13 +1,8 @@
 import { Router } from "express";
 
-import type {
-  TranslationOptions,
-} from "../services/translationService.js";
-
-import {
-  getTranslationQualityReport,
-  QualityReportError,
-} from "../services/translationQualityService.js";
+import type {TranslationOptions,} from "../services/translationService.js";
+import {QualityReportError,} from "../services/translationQualityService.js";
+import {qualityReviewService,} from "../services/translationQualityReviewService.js";
 
 const router = Router();
 
@@ -93,7 +88,7 @@ router.get<{ bookId: string }>(
 
     try {
       const report =
-        getTranslationQualityReport(
+        qualityReviewService.getReviewedReport(
           bookId,
           settings
         );
@@ -115,6 +110,73 @@ router.get<{ bookId: string }>(
       res.status(500).json({
         error:
           "Failed to generate translation quality report"
+      });
+    }
+  }
+);
+
+
+// POST /api/translation-quality/:bookId/reviews
+router.post<{ bookId: string }>(
+  "/:bookId/reviews",
+  (req, res) => {
+    const bookId = parseId(
+      req.params.bookId
+    );
+
+    const body: unknown = req.body;
+
+    if (
+      bookId === null ||
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      res.status(400).json({
+        error: "Invalid review request",
+      });
+      return;
+    }
+
+    const input =
+      body as Record<string, unknown>;
+
+    if (
+      !isSettings(input.settings) ||
+      typeof input.issueId !== "string" ||
+      typeof input.reviewed !== "boolean"
+    ) {
+      res.status(400).json({
+        error: "Invalid review parameters",
+      });
+      return;
+    }
+
+    try {
+      const result =
+        qualityReviewService.setReviewed(
+          bookId,
+          input.settings,
+          input.issueId,
+          input.reviewed
+        );
+
+      res.json(result);
+    } catch (error) {
+      if (error instanceof QualityReportError) {
+        res.status(error.statusCode).json({
+          error: error.message,
+        });
+        return;
+      }
+
+      console.error(
+        "Failed to update quality review:",
+        error
+      );
+
+      res.status(500).json({
+        error: "Failed to update quality review",
       });
     }
   }

@@ -177,4 +177,35 @@ db.exec(`
     )
   );
 `);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS translation_quality_reviews (
+    issue_id TEXT PRIMARY KEY,
+
+    book_id INTEGER NOT NULL,
+    block_id INTEGER NOT NULL,
+
+    target_language TEXT NOT NULL,
+    style TEXT NOT NULL,
+    context_mode TEXT NOT NULL,
+
+    reviewed_at TEXT NOT NULL
+      DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (book_id)
+      REFERENCES books(id)
+      ON DELETE CASCADE,
+
+    FOREIGN KEY (block_id)
+      REFERENCES content_blocks(id)
+      ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_quality_reviews_book
+    ON translation_quality_reviews (
+      book_id,
+      target_language,
+      style,
+      context_mode
+    );
+`);
 export default db;

@@ -2,17 +2,10 @@ import * as cheerio from "cheerio";
 
 import db from "../database/database.js";
 
-import {
-  createGlossaryRepository,
-} from "../database/glossaryRepository.js";
-
-import {
-  selectRelevantGlossaryEntries,
-} from "./glossaryContextService.js";
-
-import type {
-  TranslationOptions,
-} from "./translationService.js";
+import {createGlossaryRepository,} from "../database/glossaryRepository.js";
+import {selectRelevantGlossaryEntries,} from "./glossaryContextService.js";
+import { createHash } from "node:crypto";
+import type {TranslationOptions,} from "./translationService.js";
 
 export const MAX_REPORTED_ISSUES = 100;
 
@@ -25,6 +18,7 @@ export type QualityIssueKind =
   | "glossary_inconsistency";
 
 export interface QualityIssue {
+  issueId: string;
   kind: QualityIssueKind;
   blockId: number;
   chapterTitle: string;
@@ -227,7 +221,7 @@ export function getBookQualityReport(
   let totalIssues = 0;
   let translatedBlocks = 0;
   let missingBlocks = 0;
-
+  
   function addIssue(
     block: QualityBlock,
     kind: QualityIssueKind,
@@ -236,13 +230,36 @@ export function getBookQualityReport(
     totalIssues++;
     issueCounts[kind]++;
 
-    // Count every issue, but avoid sending
-    // an enormous response for a long novel.
     if (issues.length >= MAX_REPORTED_ISSUES) {
       return;
     }
 
+    // A review decision belongs to this
+    // particular warning and exact content.
+    //
+    // When the text, XHTML, glossary wording,
+    // or translation settings change, the
+    // identifier changes too.
+    const issueId = createHash("sha256")
+      .update(
+        JSON.stringify([
+          bookId,
+          block.blockId,
+          settings.targetLanguage,
+          settings.style,
+          settings.contextMode,
+          kind,
+          message,
+          block.sourceText,
+          block.sourceHtml,
+          block.translatedText,
+          block.translatedHtml,
+        ])
+      )
+      .digest("hex");
+
     issues.push({
+      issueId,
       kind,
       blockId: block.blockId,
       chapterTitle: block.chapterTitle,
