@@ -15,6 +15,7 @@ import {validateEpub,} from "./epubValidationService.js";
 import type {TranslationOptions,} from "./translationService.js";
 import {updateEpubMetadata,} from "./epubMetadataService.js";
 import {updateDocumentLanguages,} from "./epubDocumentLanguageService.js";
+import {assertEpubReferences,} from "./epubReferenceValidationService.js";
 
 export interface ExportValidation {
   ready: boolean;
@@ -354,6 +355,8 @@ export async function generateTranslatedEpub(
     `EPUB validated: ${validation.filesChecked} files, ` +
     `${validation.xhtmlFilesChecked} XHTML files`
   );
+
+  await assertEpubReferences(result);
 
   return result;
 }
