@@ -33,6 +33,10 @@ import {
   improveLiterarySegments,
 } from "./literarySegmentationService.js";
 
+import {
+  getDialogueTranslationGuidance,
+} from "./dialogueTranslationPrompt.js";
+
 export interface TranslationOptions {
   targetLanguage: string;
   style: "literary" | "faithful";
@@ -143,7 +147,13 @@ Glossary rules:
     instructions: [
       instructions,
       getTranslationStyleGuidance(settings.style),
-    ].join("\n\n"),
+      getDialogueTranslationGuidance(
+        text,
+        settings.style
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
     input:
       `${context}` +
       `${glossaryContext}` +
