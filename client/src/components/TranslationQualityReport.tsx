@@ -15,7 +15,11 @@ type IssueKind =
   | "untranslated_source"
   | "short_translation"
   | "formatting_difference"
-  | "glossary_inconsistency";
+  | "glossary_inconsistency"
+  | "possible_omission"
+  | "possible_addition"
+  | "repeated_translation"
+  | "number_mismatch";
 
 interface QualityIssue {
   issueId: string;
@@ -52,12 +56,35 @@ const ISSUE_LABELS: Record<
   IssueKind,
   string
 > = {
-  missing_translation: "Missing translation",
-  missing_translated_html: "Missing XHTML",
-  untranslated_source: "Untranslated text",
-  short_translation: "Short translation",
-  formatting_difference: "Formatting difference",
-  glossary_inconsistency: "Glossary inconsistency",
+  missing_translation:
+    "Missing translation",
+
+  missing_translated_html:
+    "Missing XHTML",
+
+  untranslated_source:
+    "Untranslated text",
+
+  short_translation:
+    "Short translation",
+
+  formatting_difference:
+    "Formatting difference",
+
+  glossary_inconsistency:
+    "Glossary inconsistency",
+
+  possible_omission:
+    "Possible omitted content",
+
+  possible_addition:
+    "Possible added content",
+
+  repeated_translation:
+    "Repeated translation",
+
+  number_mismatch:
+    "Numbers differ",
 };
 
 async function getApiError(

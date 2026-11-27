@@ -22,7 +22,11 @@ type IssueKind =
   | "untranslated_source"
   | "short_translation"
   | "formatting_difference"
-  | "glossary_inconsistency";
+  | "glossary_inconsistency"
+  | "possible_omission"
+  | "possible_addition"
+  | "repeated_translation"
+  | "number_mismatch";
 
 interface ExportBlocker {
   code: string;
@@ -78,6 +82,22 @@ const WARNING_LABELS: Array<{
   {
     kind: "short_translation",
     label: "Unusually short translations",
+  },
+  {
+    kind: "possible_omission",
+    label: "Possible omitted passages",
+  },
+  {
+    kind: "possible_addition",
+    label: "Possible added content",
+  },
+  {
+    kind: "repeated_translation",
+    label: "Repeated translated sentences",
+  },
+  {
+    kind: "number_mismatch",
+    label: "Numerical inconsistencies",
   },
 ];
 

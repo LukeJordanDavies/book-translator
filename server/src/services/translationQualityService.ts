@@ -6,6 +6,7 @@ import {createGlossaryRepository,} from "../database/glossaryRepository.js";
 import {selectRelevantGlossaryEntries,} from "./glossaryContextService.js";
 import { createHash } from "node:crypto";
 import type {TranslationOptions,} from "./translationService.js";
+import {reviewTranslatedContent,} from "./translationContentReviewService.js";
 
 export const MAX_REPORTED_ISSUES = 100;
 
@@ -15,7 +16,11 @@ export type QualityIssueKind =
   | "untranslated_source"
   | "short_translation"
   | "formatting_difference"
-  | "glossary_inconsistency";
+  | "glossary_inconsistency"
+  | "possible_omission"
+  | "possible_addition"
+  | "repeated_translation"
+  | "number_mismatch";
 
 export interface QualityIssue {
   issueId: string;
@@ -214,6 +219,10 @@ export function getBookQualityReport(
     short_translation: 0,
     formatting_difference: 0,
     glossary_inconsistency: 0,
+    possible_omission: 0,
+    possible_addition: 0,
+    repeated_translation: 0,
+    number_mismatch: 0,
   };
 
   const issues: QualityIssue[] = [];
@@ -358,6 +367,23 @@ export function getBookQualityReport(
         "short_translation",
         "The translation is unusually short " +
         "compared with the original."
+      );
+    }
+
+    // Review the original and translated text
+    // for possible omissions, additions,
+    // repeated sentences, and changed numbers.
+    const contentFindings = reviewTranslatedContent(
+      block.sourceText,
+      block.translatedText,
+      settings.targetLanguage
+    );
+
+    for (const finding of contentFindings) {
+      addIssue(
+        block,
+        finding.kind,
+        finding.message
       );
     }
 

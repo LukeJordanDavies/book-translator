@@ -105,7 +105,11 @@ export function buildExportReadiness(
     report.issueCounts.untranslated_source +
     report.issueCounts.short_translation +
     report.issueCounts.formatting_difference +
-    report.issueCounts.glossary_inconsistency;
+    report.issueCounts.glossary_inconsistency +
+    report.issueCounts.possible_omission +
+    report.issueCounts.possible_addition +
+    report.issueCounts.repeated_translation +
+    report.issueCounts.number_mismatch;
 
   const status: ExportReadinessStatus =
     blockers.length > 0

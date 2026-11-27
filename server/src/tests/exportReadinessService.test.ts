@@ -24,6 +24,10 @@ function emptyCounts(): Record<
     short_translation: 0,
     formatting_difference: 0,
     glossary_inconsistency: 0,
+    possible_omission: 0,
+    possible_addition: 0,
+    repeated_translation: 0,
+    number_mismatch: 0,
   };
 }
 
